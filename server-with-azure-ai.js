@@ -38,6 +38,25 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));  // Serve static files
 
+// Mongoose (MongoDB / Cosmos DB - Mongo API) connection (optional)
+const mongoose = require('mongoose');
+const MONGO_URI = process.env.MONGO_URI;
+if (!MONGO_URI) {
+  console.warn('MONGO_URI not set. If you want Mongo (Cosmos Mongo API) persistence, set MONGO_URI in .env');
+} else {
+  mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('✓ Connected to MongoDB (via MONGO_URI)'))
+    .catch(err => console.error('✗ MongoDB connection error (MONGO_URI):', err && err.message ? err.message : err));
+}
+
+// Optional: Mongoose Ticket model (used to persist tickets created by the agent)
+let TicketModel = null;
+try {
+  TicketModel = require('./models/Ticket');
+} catch (e) {
+  TicketModel = null;
+}
+
 const PORT = process.env.PORT || 3000;
 
 // ============================================
@@ -1157,6 +1176,25 @@ async function executeToolCall(toolCall) {
           console.log(`? Ticket ${ticketId} saved to in-memory storage`);
         }
 
+        // Also try to persist via Mongoose Ticket model (if available).
+        // This ensures tickets created via the agent also appear in the Mongo/Cosmos (Mongo API) collection
+        try {
+          if (TicketModel) {
+            const mongoDoc = await TicketModel.create({
+              guestName: ticket.guestName,
+              roomNumber: ticket.roomNumber,
+              requestType: ticket.requestType,
+              priority: ticket.priority,
+              description: ticket.description,
+              status: ticket.status,
+              meta: { createdBy: 'agent', externalId: ticketId }
+            });
+            console.log(`? Ticket ${ticketId} also saved to MongoDB (Mongoose) _id=${mongoDoc._id}`);
+          }
+        } catch (mErr) {
+          console.error('Mongoose save (agent) failed:', mErr && mErr.message ? mErr.message : mErr);
+        }
+
         // Estimate response time based on request type
         const estimatedTime = {
           'Housekeeping': '15-20 minutes',
@@ -1690,6 +1728,18 @@ function detectIntent(text) {
 }
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', azureAI: !!azureOpenAIClient }));
+
+// Mount Express tickets router (Mongoose-backed) if available
+try {
+  const ticketsRouter = require('./routes/tickets');
+  if (ticketsRouter) {
+    app.use('/api/tickets', ticketsRouter);
+    console.log('✓ Mongoose tickets router mounted at /api/tickets');
+  }
+} catch (e) {
+  // Router not present or failed to load; continue without it
+  console.warn('Tickets router not mounted (./routes/tickets not found or failed to load)');
+}
 
 // Analytics API endpoint
 app.get('/api/analytics', (req, res) => {
