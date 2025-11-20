@@ -1,0 +1,41 @@
+? Azure OpenAI initialized with API Key
+✓ Mongoose tickets router mounted at /api/tickets
+?? AI Concierge with Azure AI listening on http://localhost:3000
+   Azure AI Agent: ? Enabled
+   Analytics Dashboard: http://localhost:3000/analytics
+✓ Connected to MongoDB (via MONGO_URI)
+? Profile saved to in-memory for session agent-test-3
+?? Using Azure AI Agent for message: Housekeeping request: extra towels and beds made for Room 103
+?? Agent requested 1 tool call(s)
+?? Executing tool: createTicket {
+  roomNumber: '103',
+  requestType: 'Housekeeping',
+  priority: 'Medium',
+  description: 'Request for extra towels and beds to be made.'
+}
+? Ticket TKT-1763619064372-36 saved to in-memory storage
+? Ticket TKT-1763619064372-36 also saved to MongoDB (Mongoose) _id=691eb0f8d09bbe8f1c463947
+? Profile saved to in-memory for session agent-test-4
+?? Using Azure AI Agent for message: Maintenance: AC not cooling in Room 202, please create ticket
+?? Agent requested 1 tool call(s)
+?? Executing tool: createTicket {
+  roomNumber: '202',
+  requestType: 'Maintenance',
+  priority: 'High',
+  description: 'AC not cooling in Room 202'
+}
+? Ticket TKT-1763619067617-66 saved to in-memory storage
+? Ticket TKT-1763619067617-66 also saved to MongoDB (Mongoose) _id=691eb0fbd09bbe8f1c463949
+? Profile saved to in-memory for session session-0cme0pc
+?? Using Azure AI Agent for message: creat a ticket for room 101. There is a fire.
+? Profile saved to in-memory for session session-0cme0pc
+?? Using Azure AI Agent for message: create a ticket for a leaky faucet in room 202
+?? Agent requested 1 tool call(s)
+?? Executing tool: createTicket {
+  roomNumber: '202',
+  requestType: 'Maintenance',
+  priority: 'Medium',
+  description: 'Leaky faucet in room 202'
+}
+? Ticket TKT-1763619325425-381 saved to in-memory storage
+? Ticket TKT-1763619325425-381 also saved to MongoDB (Mongoose) _id=691eb1fdd09bbe8f1c46394c
