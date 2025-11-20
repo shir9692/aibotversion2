@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Ticket Details</title>
+  <style>
+    body{font-family:Segoe UI, Roboto, Arial; padding:20px; background:#f7f9fc}
+    .card{background:#fff;padding:18px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);max-width:900px;margin:20px auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left}
+    th{width:180px;color:#333}
+    pre{background:#0f1724;color:#dbeafe;padding:10px;border-radius:6px;overflow:auto}
+    a.btn{display:inline-block;margin-bottom:10px;padding:8px 12px;background:#667eea;color:#fff;border-radius:6px;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <a class="btn" href="index.html">← Back</a>
+    <h2>Ticket Details</h2>
+    <div id="content">Loading…</div>
+  </div>
+
+  <script>
+    function qs(name) {
+      const params = new URLSearchParams(location.search);
+      return params.get(name);
+    }
+
+    async function fetchById(id) {
+      const r = await fetch('/api/tickets/' + encodeURIComponent(id));
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error('Failed to fetch ticket: ' + r.status);
+      return r.json();
+    }
+
+    async function fetchByExternalId(externalId) {
+      const r = await fetch('/api/tickets/admin?externalId=' + encodeURIComponent(externalId) + '&limit=1');
+      if (!r.ok) throw new Error('Failed admin lookup: ' + r.status);
+      const j = await r.json();
+      if (j.tickets && j.tickets.length) return j.tickets[0];
+      return null;
+    }
+
+    function render(t) {
+      if (!t) {
+        document.getElementById('content').innerHTML = '<div style="color:#b00">Ticket not found</div>';
+        return;
+      }
+      const rows = [
+        ['_id', t._id || t.id || ''],
+        ['Guest Name', t.guestName || ''],
+        ['Room Number', t.roomNumber || ''],
+        ['Request Type', t.requestType || ''],
+        ['Priority', t.priority || ''],
+        ['Status', t.status || ''],
+        ['Created At', t.createdAt || t.created || (t.meta && t.meta.createdAt) || ''],
+        ['Updated At', t.updatedAt || ''],
+        ['Description', t.description || '']
+      ];
+
+      let html = '<table>' + rows.map(r => `<tr><th>${r[0]}</th><td>${r[1] === '' ? '&nbsp;' : escapeHtml(String(r[1]))}</td></tr>`).join('') + '</table>';
+      html += '<h3>Meta</h3><pre>' + escapeHtml(JSON.stringify(t.meta || {}, null, 2)) + '</pre>';
+      document.getElementById('content').innerHTML = html;
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"]+/g, function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[m]||m;});
+    }
+
+    (async function(){
+      const id = qs('id');
+      if (!id) {
+        document.getElementById('content').innerHTML = '<div style="color:#b00">Missing ticket id</div>';
+        return;
+      }
+      try {
+        let t = null;
+        try { t = await fetchById(id); } catch(e) { /* ignore */ }
+        if (!t) {
+          // try externalId lookup
+          t = await fetchByExternalId(id);
+        }
+        render(t);
+      } catch (err) {
+        document.getElementById('content').innerText = 'Error: ' + (err && err.message ? err.message : String(err));
+      }
+    })();
+  </script>
+</body>
+</html>

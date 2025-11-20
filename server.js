@@ -9,6 +9,8 @@ const cors = require('cors');
 const fs = require('fs');
 const Fuse = require('fuse.js');
 
+// (No DB connection here in this original server file)
+
 const qna = JSON.parse(fs.readFileSync('./qna.json', 'utf8'));
 const FALLBACK_PLACES = JSON.parse(fs.readFileSync('./fallback_places.json', 'utf8'));
 
@@ -16,6 +18,8 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));  // Serve static files (index.html, etc.)
+
+// (Tickets router not required here)
 
 const PORT = process.env.PORT || 3000;
 
@@ -401,6 +405,8 @@ app.post('/api/message', async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// (No tickets router mounted in this file)
 
 app.listen(PORT, () => {
   console.log(`AI Concierge prototype listening on http://localhost:${PORT}`);

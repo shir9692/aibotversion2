@@ -18,7 +18,6 @@ const { CosmosClient } = require('@azure/cosmos');
 // Load data files relative to this script directory to avoid CWD issues
 let qna = [];
 let FALLBACK_PLACES = [];
-let hotelKnowledge = [];
 try {
   const qnaPath = path.join(__dirname, 'qna.json');
   qna = JSON.parse(fs.readFileSync(qnaPath, 'utf8'));
@@ -33,19 +32,30 @@ try {
   console.error('Failed to load fallback_places.json:', e && e.message ? e.message : e);
   FALLBACK_PLACES = [];
 }
-try {
-  const knowledgePath = path.join(__dirname, 'hotel_knowledge.json');
-  hotelKnowledge = JSON.parse(fs.readFileSync(knowledgePath, 'utf8'));
-  console.log(`✅ Loaded ${hotelKnowledge.length} hotel knowledge documents`);
-} catch (e) {
-  console.error('Failed to load hotel_knowledge.json:', e && e.message ? e.message : e);
-  hotelKnowledge = [];
-}
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));  // Serve static files
+
+// Mongoose (MongoDB / Cosmos DB - Mongo API) connection (optional)
+const mongoose = require('mongoose');
+const MONGO_URI = process.env.MONGO_URI;
+if (!MONGO_URI) {
+  console.warn('MONGO_URI not set. If you want Mongo (Cosmos Mongo API) persistence, set MONGO_URI in .env');
+} else {
+  mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('✓ Connected to MongoDB (via MONGO_URI)'))
+    .catch(err => console.error('✗ MongoDB connection error (MONGO_URI):', err && err.message ? err.message : err));
+}
+
+// Optional: Mongoose Ticket model (used to persist tickets created by the agent)
+let TicketModel = null;
+try {
+  TicketModel = require('./models/Ticket');
+} catch (e) {
+  TicketModel = null;
+}
 
 const PORT = process.env.PORT || 3000;
 
@@ -216,154 +226,6 @@ function createNewProfile(sessionId) {
 }
 
 // ============================================
-// RAG SYSTEM - SEMANTIC SEARCH WITH EMBEDDINGS
-// ============================================
-
-let knowledgeBaseEmbeddings = []; // Store documents with their embeddings
-let ragInitialized = false;
-
-// Cosine similarity function
-function cosineSimilarity(vecA, vecB) {
-  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
-  
-  let dotProduct = 0;
-  let magA = 0;
-  let magB = 0;
-  
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    magA += vecA[i] * vecA[i];
-    magB += vecB[i] * vecB[i];
-  }
-  
-  magA = Math.sqrt(magA);
-  magB = Math.sqrt(magB);
-  
-  if (magA === 0 || magB === 0) return 0;
-  return dotProduct / (magA * magB);
-}
-
-// Generate embedding for text using Azure OpenAI
-async function generateEmbedding(text) {
-  if (!azureOpenAIClient) return null;
-  
-  try {
-    // Create a new client specifically for embeddings with correct deployment
-    const embeddingClient = new AzureOpenAI({
-      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview',
-      deployment: 'text-embedding-ada-002' // Use embedding deployment name
-    });
-    
-    const response = await embeddingClient.embeddings.create({
-      model: 'text-embedding-ada-002',
-      input: text.substring(0, 8000) // Limit to 8000 chars
-    });
-    
-    return response.data[0].embedding;
-  } catch (error) {
-    console.error('Embedding generation error:', error.message);
-    return null;
-  }
-}
-
-// Initialize RAG knowledge base with embeddings
-async function initializeRAG() {
-  if (!azureOpenAIClient || hotelKnowledge.length === 0) {
-    console.log('⚠️  RAG not initialized - Azure OpenAI or knowledge base missing');
-    return;
-  }
-  
-  console.log('🔄 Initializing RAG system - generating embeddings...');
-  
-  try {
-    const startTime = Date.now();
-    
-    // Generate embeddings for all knowledge documents
-    for (const doc of hotelKnowledge) {
-      const text = `${doc.title}. ${doc.content}`;
-      const embedding = await generateEmbedding(text);
-      
-      if (embedding) {
-        knowledgeBaseEmbeddings.push({
-          ...doc,
-          embedding: embedding
-        });
-      }
-      
-      // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    ragInitialized = true;
-    console.log(`✅ RAG initialized with ${knowledgeBaseEmbeddings.length} documents in ${duration}s`);
-  } catch (error) {
-    console.error('❌ RAG initialization failed:', error.message);
-  }
-}
-
-// Semantic search using RAG
-async function semanticSearch(query, topK = 3) {
-  if (!ragInitialized || knowledgeBaseEmbeddings.length === 0) {
-    console.log('RAG not available, using fallback');
-    return [];
-  }
-  
-  try {
-    // Generate embedding for user query
-    const queryEmbedding = await generateEmbedding(query);
-    if (!queryEmbedding) return [];
-    
-    // Calculate similarity with all documents
-    const results = knowledgeBaseEmbeddings.map(doc => {
-      const similarity = cosineSimilarity(queryEmbedding, doc.embedding);
-      return {
-        id: doc.id,
-        title: doc.title,
-        content: doc.content,
-        category: doc.category,
-        similarity: similarity
-      };
-    });
-    
-    // Sort by similarity and return top results
-    const topResults = results
-      .filter(r => r.similarity > 0.7) // Only return relevant results
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, topK);
-    
-    console.log(`🔍 Semantic search found ${topResults.length} relevant documents`);
-    return topResults;
-  } catch (error) {
-    console.error('Semantic search error:', error.message);
-    return [];
-  }
-}
-
-// Answer question using RAG
-async function answerWithRAG(query) {
-  const relevantDocs = await semanticSearch(query, 3);
-  
-  if (relevantDocs.length === 0) {
-    // Fall back to old qna.json search
-    return answerFromQnA(query);
-  }
-  
-  // Build context from retrieved documents
-  const context = relevantDocs
-    .map(doc => `${doc.title}:\n${doc.content}`)
-    .join('\n\n');
-  
-  return {
-    answer: context,
-    sources: relevantDocs.map(d => ({ id: d.id, title: d.title, similarity: d.similarity.toFixed(3) })),
-    useRAG: true
-  };
-}
-
-// ============================================
 // AZURE OPENAI AGENT SETUP
 // ============================================
 
@@ -436,13 +298,13 @@ const agentTools = [
     type: 'function',
     function: {
       name: 'getHotelInfo',
-      description: 'REQUIRED for ALL hotel-related questions. Call this tool to get accurate information about: hotel policies (check-in/out times, cancellation), amenities (WiFi password, pool, fitness center, parking), services (breakfast, room service, housekeeping), pet policy, accessibility features, payment methods, and any other hotel facility or policy questions. This tool uses semantic search to find the most relevant information from the hotel knowledge base.',
+      description: 'Get information about hotel amenities, policies, check-in/out times, WiFi, breakfast, etc.',
       parameters: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
-            description: 'The hotel-related question exactly as the guest asked it (e.g., "can I bring my cat?", "what time is check in?", "is there free wifi?", "where do I park?")'
+            description: 'The hotel-related question (e.g., "check-in time", "wifi password", "breakfast hours")'
           }
         },
         required: ['query']
@@ -1023,7 +885,7 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
         startDateTime = new Date(now);
         startDateTime.setHours(0, 0, 0, 0);
         endDateTime = new Date(now);
-        endDateTime.setHours(23, 59, 59, 999);s
+        endDateTime.setHours(23, 59, 59, 999);
         break;
       default: // this_week
         startDateTime = new Date(now);
@@ -1271,26 +1133,11 @@ async function executeToolCall(toolCall) {
     }
 
     case 'getHotelInfo': {
-      // Try RAG semantic search first
-      const ragResult = await answerWithRAG(args.query);
-      
-      if (ragResult && ragResult.useRAG && ragResult.sources.length > 0) {
-        return {
-          success: true,
-          answer: ragResult.answer,
-          sources: ragResult.sources,
-          query: args.query,
-          method: 'RAG'
-        };
-      }
-      
-      // Fall back to old Q&A search
       const answer = answerFromQnA(args.query);
       return {
         success: true,
         answer: answer || 'I don\'t have that specific information. Please contact hotel staff.',
-        query: args.query,
-        method: 'QnA'
+        query: args.query
       };
     }
 
@@ -1327,6 +1174,25 @@ async function executeToolCall(toolCall) {
           // Fallback to in-memory storage
           inMemoryTickets.push(ticket);
           console.log(`? Ticket ${ticketId} saved to in-memory storage`);
+        }
+
+        // Also try to persist via Mongoose Ticket model (if available).
+        // This ensures tickets created via the agent also appear in the Mongo/Cosmos (Mongo API) collection
+        try {
+          if (TicketModel) {
+            const mongoDoc = await TicketModel.create({
+              guestName: ticket.guestName,
+              roomNumber: ticket.roomNumber,
+              requestType: ticket.requestType,
+              priority: ticket.priority,
+              description: ticket.description,
+              status: ticket.status,
+              meta: { createdBy: 'agent', externalId: ticketId }
+            });
+            console.log(`? Ticket ${ticketId} also saved to MongoDB (Mongoose) _id=${mongoDoc._id}`);
+          }
+        } catch (mErr) {
+          console.error('Mongoose save (agent) failed:', mErr && mErr.message ? mErr.message : mErr);
         }
 
         // Estimate response time based on request type
@@ -1535,30 +1401,13 @@ async function handleAzureAIAgent(userMessage, conversationHistory = [], guestPr
   const messages = [
     {
       role: 'system',
-      content: `You are a warm and experienced hotel concierge AI assistant dedicated to making every guest's stay exceptional.
-
-Your personality:
-- Professional yet genuinely friendly and approachable
-- Attentive to details and anticipate guest needs
-- Patient and understanding, especially with first-time visitors
-- Enthusiastic about helping guests discover great experiences
-- Express care through your responses (e.g., "I'd be happy to help with that!", "Great choice!", "I hope you enjoy!")
-
-You help guests with:
-- Finding wonderful nearby attractions, restaurants, and places to visit
-- Answering hotel-related questions (check-in/out, amenities, WiFi, etc.) - ALWAYS use getHotelInfo tool for these
-- Providing transportation information and local insights
-- Creating service tickets for guest requests with care and urgency
-- Collecting guest preferences for thoughtful, personalized recommendations
-- General hospitality assistance with a smile
-
-IMPORTANT: For ANY question about the hotel (policies, amenities, services, facilities), you MUST call the getHotelInfo tool. Never answer hotel questions from general knowledge.
-
-Communication style:
-- Start conversations warmly and welcome guests genuinely
-- Use phrases like "I'd be delighted to help", "Wonderful!", "Let me find that for you"
-- End interactions with encouraging notes like "Enjoy your visit!", "Have a great time!", or "Please let me know if you need anything else"
-- Be conversational but maintain professionalism
+      content: `You are a helpful hotel concierge AI assistant. You help guests with:
+  - Finding nearby attractions, restaurants, and places to visit
+  - Answering hotel-related questions (check-in/out, amenities, WiFi, etc.)
+  - Providing transportation information
+  - Creating service tickets for guest requests
+  - Collecting guest preferences for personalized recommendations
+  - General hospitality assistance
 ${locationContext}${profileContext}${onboardingPrompt}
 
   CRITICAL RULES for place searches - FOLLOW EXACTLY:
@@ -1880,6 +1729,18 @@ function detectIntent(text) {
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', azureAI: !!azureOpenAIClient }));
 
+// Mount Express tickets router (Mongoose-backed) if available
+try {
+  const ticketsRouter = require('./routes/tickets');
+  if (ticketsRouter) {
+    app.use('/api/tickets', ticketsRouter);
+    console.log('✓ Mongoose tickets router mounted at /api/tickets');
+  }
+} catch (e) {
+  // Router not present or failed to load; continue without it
+  console.warn('Tickets router not mounted (./routes/tickets not found or failed to load)');
+}
+
 // Analytics API endpoint
 app.get('/api/analytics', (req, res) => {
   try {
@@ -1895,20 +1756,9 @@ app.get('/analytics', (req, res) => {
   res.sendFile(path.join(__dirname, 'analytics-dashboard.html'));
 });
 
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`?? AI Concierge with Azure AI listening on http://localhost:${PORT}`);
   console.log(`   Azure AI Agent: ${USE_AZURE_AI ? '? Enabled' : '? Disabled'}`);
   console.log(`   Analytics Dashboard: http://localhost:${PORT}/analytics`);
-  
-  // Initialize RAG system after server starts
-  if (USE_AZURE_AI && azureOpenAIClient && hotelKnowledge.length > 0) {
-    console.log('\\n?? Initializing RAG system...');
-    await initializeRAG();
-    console.log('?? RAG System Status:', ragInitialized ? '? Ready' : '? Not Available');
-  } else {
-    console.log('\\n\u26a0\ufe0f  RAG system disabled (requires Azure OpenAI and hotel_knowledge.json)');
-  }
-  
-  console.log('\\n??? Server ready! Try asking hotel questions to test RAG semantic search.\\n');
 });
 
