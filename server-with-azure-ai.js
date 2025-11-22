@@ -44,9 +44,30 @@ const MONGO_URI = process.env.MONGO_URI;
 if (!MONGO_URI) {
   console.warn('MONGO_URI not set. If you want Mongo (Cosmos Mongo API) persistence, set MONGO_URI in .env');
 } else {
-  mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  // Use modern connection semantics. Avoid deprecated options and add useful timeouts.
+  mongoose.set('strictQuery', false);
+
+  const connectOpts = {
+    // Recommended timeout values; adjust as needed
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    // Force IPv4 if needed: family: 4,
+  };
+
+  mongoose.connect(MONGO_URI, connectOpts)
     .then(() => console.log('✓ Connected to MongoDB (via MONGO_URI)'))
     .catch(err => console.error('✗ MongoDB connection error (MONGO_URI):', err && err.message ? err.message : err));
+
+  // Connection event logging
+  mongoose.connection.on('connected', () => {
+    console.log('? Mongoose connection state: connected');
+  });
+  mongoose.connection.on('error', (err) => {
+    console.error('? Mongoose connection error:', err && err.message ? err.message : err);
+  });
+  mongoose.connection.on('disconnected', () => {
+    console.warn('? Mongoose disconnected');
+  });
 }
 
 // Optional: Mongoose Ticket model (used to persist tickets created by the agent)
