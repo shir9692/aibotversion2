@@ -89,6 +89,44 @@
     #analytics-panel.collapsed .analytics-content {
       display: none;
     }
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .action-btn {
+      background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
+      border: 1px solid #e0e4ff;
+      border-radius: 10px;
+      padding: 10px 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #667eea;
+    }
+    .action-btn:hover {
+      border-color: #667eea;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .action-btn:active {
+      transform: scale(0.98);
+    }
+    .action-icon {
+      font-size: 20px;
+    }
+    .action-text {
+      font-size: 9px;
+      line-height: 1.2;
+    }
     .stat-mini {
       background: #f8f9fa;
       border-left: 3px solid #667eea;
@@ -128,6 +166,26 @@
     }
     .mini-list-item:last-child {
       border-bottom: none;
+    }
+    .schedule-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f5f5f5;
+      font-size: 12px;
+    }
+    .schedule-item:last-child {
+      border-bottom: none;
+    }
+    .schedule-label {
+      color: #333;
+      font-weight: 500;
+    }
+    .schedule-time {
+      color: #667eea;
+      font-weight: 600;
+      font-size: 11px;
     }
     .mini-count {
       color: #667eea;
@@ -217,11 +275,105 @@
       margin-top: 10px;
       text-align: center;
     }
+    .ticker-container {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 12px;
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .weather-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+      margin-bottom: 10px;
+    }
+    .weather-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .weather-temp {
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .weather-location {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+    .events-section {
+      overflow: hidden;
+      position: relative;
+    }
+    .ticker-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+      opacity: 0.9;
+    }
+    .ticker-content {
+      display: flex;
+      animation: scroll 30s linear infinite;
+      white-space: nowrap;
+    }
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      margin-right: 40px;
+      font-size: 13px;
+    }
+    .ticker-icon {
+      margin-right: 6px;
+      font-size: 16px;
+    }
+    @keyframes scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .ticker-content:hover {
+      animation-play-state: paused;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <div id="chat">
+      <!-- Weather & Events Ticker -->
+      <div class="ticker-container">
+        <!-- Static Weather Section -->
+        <div class="weather-section">
+          <div class="weather-info">
+            <span class="weather-temp" id="weather-temp">72°F</span>
+            <span id="weather-condition">🌤️ Sunny</span>
+          </div>
+          <div class="weather-location" id="weather-location">📍 New York City, NY</div>
+        </div>
+        
+        <!-- Rolling Events Section -->
+        <div class="events-section">
+          <div class="ticker-title">🎉 Upcoming Events & Activities</div>
+          <div class="ticker-content" id="ticker-content">
+            <div class="ticker-item"><span class="ticker-icon">🎭</span>Broadway Show at 8 PM - Times Square</div>
+            <div class="ticker-item"><span class="ticker-icon">🍽️</span>Happy Hour 5-7 PM at Hotel Bar</div>
+            <div class="ticker-item"><span class="ticker-icon">🎨</span>MoMA Exhibition: Modern Masters - Open until 9 PM</div>
+            <div class="ticker-item"><span class="ticker-icon">🏃</span>Morning Yoga - Hotel Gym 7 AM Tomorrow</div>
+            <div class="ticker-item"><span class="ticker-icon">⚽</span>Yankees Game Tonight - Yankee Stadium 7:30 PM</div>
+            <!-- Duplicate for seamless loop -->
+            <div class="ticker-item"><span class="ticker-icon">🎭</span>Broadway Show at 8 PM - Times Square</div>
+            <div class="ticker-item"><span class="ticker-icon">🍽️</span>Happy Hour 5-7 PM at Hotel Bar</div>
+            <div class="ticker-item"><span class="ticker-icon">🎨</span>MoMA Exhibition: Modern Masters - Open until 9 PM</div>
+            <div class="ticker-item"><span class="ticker-icon">🏃</span>Morning Yoga - Hotel Gym 7 AM Tomorrow</div>
+            <div class="ticker-item"><span class="ticker-icon">⚽</span>Yankees Game Tonight - Yankee Stadium 7:30 PM</div>
+          </div>
+        </div>
+      </div>
+
       <div id="history"></div>
 
       <div id="controls">
@@ -245,41 +397,75 @@
 
     <div id="analytics-panel">
       <div class="analytics-header" onclick="toggleAnalytics()">
-        <h3>📊 Analytics</h3>
+        <h3>📊 Guest Services</h3>
         <button class="toggle-btn" id="toggle-icon">◀</button>
       </div>
       <div class="analytics-content">
-        <div class="stat-mini">
-          <div class="stat-mini-label">Messages</div>
-          <div class="stat-mini-value" id="stat-messages">0</div>
-        </div>
-        <div class="stat-mini">
-          <div class="stat-mini-label">Sessions</div>
-          <div class="stat-mini-value" id="stat-sessions">0</div>
-        </div>
-        <div class="stat-mini">
-          <div class="stat-mini-label">Tickets</div>
-          <div class="stat-mini-value" id="stat-tickets">0</div>
-        </div>
-
         <div class="mini-list">
-          <div class="mini-list-title">🔥 Top Questions</div>
-          <div id="top-questions-mini">
-            <div style="text-align:center; color:#999; padding:10px;">No data yet</div>
+          <div class="mini-list-title">🏨 Hotel Hours & Info</div>
+          <div id="hotel-schedule">
+            <div class="schedule-item">
+              <span class="schedule-label">🍳 Breakfast</span>
+              <span class="schedule-time">6:30 AM - 10:30 AM</span>
+            </div>
+            <div class="schedule-item">
+              <span class="schedule-label">🍽️ Restaurant</span>
+              <span class="schedule-time">11:00 AM - 11:00 PM</span>
+            </div>
+            <div class="schedule-item">
+              <span class="schedule-label">🏊 Pool</span>
+              <span class="schedule-time">7:00 AM - 10:00 PM</span>
+            </div>
+            <div class="schedule-item">
+              <span class="schedule-label">💪 Gym</span>
+              <span class="schedule-time">24 Hours</span>
+            </div>
+            <div class="schedule-item">
+              <span class="schedule-label">🛎️ Front Desk</span>
+              <span class="schedule-time">24/7</span>
+            </div>
+            <div class="schedule-item">
+              <span class="schedule-label">🚪 Checkout</span>
+              <span class="schedule-time">11:00 AM</span>
+            </div>
+            <div class="schedule-item">
+              <span class="schedule-label">📶 WiFi</span>
+              <span class="schedule-time">Free - HotelGuest2025</span>
+            </div>
           </div>
         </div>
 
+        <div class="quick-actions">
+          <button class="action-btn" onclick="quickAction('Housekeeping', '🧹')">
+            <span class="action-icon">🧹</span>
+            <span class="action-text">Housekeeping</span>
+          </button>
+          <button class="action-btn" onclick="quickAction('Room Service', '🍽️')">
+            <span class="action-icon">🍽️</span>
+            <span class="action-text">Room Service</span>
+          </button>
+          <button class="action-btn" onclick="quickAction('Restaurant Reservation', '🍷')">
+            <span class="action-icon">🍷</span>
+            <span class="action-text">Restaurant</span>
+          </button>
+          <button class="action-btn" onclick="quickAction('Transportation', '🚕')">
+            <span class="action-icon">🚕</span>
+            <span class="action-text">Taxi</span>
+          </button>
+          <button class="action-btn" onclick="quickAction('Maintenance', '🔧')">
+            <span class="action-icon">🔧</span>
+            <span class="action-text">Maintenance</span>
+          </button>
+          <button class="action-btn" onclick="quickAction('Concierge', '🛎️')">
+            <span class="action-icon">🛎️</span>
+            <span class="action-text">Concierge</span>
+          </button>
+        </div>
+
         <div class="mini-list">
-          <div class="mini-list-title">🎯 Recent Tickets</div>
+          <div class="mini-list-title">🎯 Your Open Requests</div>
           <div id="recent-tickets-mini">
             <div style="text-align:center; color:#999; padding:10px;">No tickets</div>
-          </div>
-        </div>
-
-        <div class="mini-list">
-          <div class="mini-list-title">📍 Locations</div>
-          <div id="locations-mini">
-            <div style="text-align:center; color:#999; padding:10px;">No searches</div>
           </div>
         </div>
 
@@ -305,6 +491,7 @@
     const rawJsonEl = document.getElementById('rawJson');
 
     let cachedCoords = null;
+    let cachedLocation = null;
     const sessionId = 'session-' + Math.random().toString(36).slice(2,9);
     const conversationHistory = [];
 
@@ -439,6 +626,38 @@
       icon.textContent = panel.classList.contains('collapsed') ? '▶' : '◀';
     }
 
+    async function quickAction(requestType, icon) {
+      const roomNumber = prompt(`${icon} ${requestType}\n\nPlease enter your room number:`, '209');
+      if (!roomNumber) return;
+
+      const details = prompt('Any specific details or requests?', '');
+      
+      try {
+        const response = await fetch('http://localhost:3000/api/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            message: `Create a ticket for ${requestType}. Room ${roomNumber}. Details: ${details || 'No specific details'}`,
+            consentLocation: false,
+            coords: null,
+            conversationHistory
+          })
+        });
+        
+        const result = await response.json();
+        
+        // Show confirmation in chat
+        append(`Request submitted: ${requestType} for Room ${roomNumber}`, 'user');
+        append(result.reply || 'Your request has been submitted. Our team will assist you shortly.', 'bot');
+        
+        // Refresh analytics to show new ticket
+        fetchAnalytics();
+      } catch (error) {
+        append(`Failed to submit request. Please try again or contact front desk.`, 'bot');
+      }
+    }
+
     async function fetchAnalytics() {
       try {
         const response = await fetch('http://localhost:3000/api/analytics');
@@ -450,29 +669,7 @@
     }
 
     function updateAnalytics(data) {
-      // Update stats
-      const sessionCount = Object.keys(data.sessions || {}).length;
-      const messageCount = Object.values(data.sessions || {}).reduce((sum, s) => sum + (s.messageCount || 0), 0);
-      const ticketCount = (data.tickets || []).length;
-
-      document.getElementById('stat-messages').textContent = messageCount;
-      document.getElementById('stat-sessions').textContent = sessionCount;
-      document.getElementById('stat-tickets').textContent = ticketCount;
-
-      // Top questions
-      const questions = data.questions || {};
-      const topQuestions = Object.entries(questions).sort((a, b) => b[1] - a[1]).slice(0, 5);
-      const questionsHtml = topQuestions.length > 0
-        ? topQuestions.map(([q, count]) => `
-            <div class="mini-list-item">
-              <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(q)}</span>
-              <span class="mini-count">${count}</span>
-            </div>
-          `).join('')
-        : '<div style="text-align:center; color:#999; padding:10px;">No questions yet</div>';
-      document.getElementById('top-questions-mini').innerHTML = questionsHtml;
-
-      // Recent tickets
+      // Recent tickets only
       const tickets = data.tickets || [];
       const recentTickets = tickets.slice(-5).reverse();
       const ticketsHtml = recentTickets.length > 0
@@ -482,21 +679,8 @@
               <span class="mini-count">${t.ticketId.split('-')[1].slice(0, 6)}</span>
             </div>
           `).join('')
-        : '<div style="text-align:center; color:#999; padding:10px;">No tickets</div>';
+        : '<div style="text-align:center; color:#999; padding:10px;">No open requests</div>';
       document.getElementById('recent-tickets-mini').innerHTML = ticketsHtml;
-
-      // Locations
-      const locations = data.locationSearches || {};
-      const topLocations = Object.entries(locations).sort((a, b) => b[1] - a[1]).slice(0, 5);
-      const locationsHtml = topLocations.length > 0
-        ? topLocations.map(([loc, count]) => `
-            <div class="mini-list-item">
-              <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(loc)}</span>
-              <span class="mini-count">${count}</span>
-            </div>
-          `).join('')
-        : '<div style="text-align:center; color:#999; padding:10px;">No searches</div>';
-      document.getElementById('locations-mini').innerHTML = locationsHtml;
 
       // Update refresh time
       document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString();
@@ -508,6 +692,142 @@
     // Fetch analytics on load and every 5 seconds
     fetchAnalytics();
     setInterval(fetchAnalytics, 5000);
+
+    // Update weather and events ticker
+    async function updateTicker() {
+      try {
+        // Get current time for dynamic events
+        const now = new Date();
+        const hour = now.getHours();
+        const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
+        
+        // Try to get user's location
+        let userLocation = cachedLocation || 'New York City, NY';
+        let coords = cachedCoords;
+        
+        // Attempt to get browser location if not cached
+        if (!cachedCoords) {
+          try {
+            const position = await new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, { 
+                timeout: 5000, 
+                maximumAge: 300000 
+              });
+            });
+            cachedCoords = {
+              lat: position.coords.latitude.toString(),
+              lon: position.coords.longitude.toString()
+            };
+            coords = cachedCoords;
+            
+            // Reverse geocode to get city name
+            const geoResponse = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lon}&format=json`
+            );
+            const geoData = await geoResponse.json();
+            
+            if (geoData.address) {
+              const city = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.county;
+              const state = geoData.address.state;
+              const country = geoData.address.country;
+              cachedLocation = city && state ? `${city}, ${state}` : (city || country || 'Your Location');
+              userLocation = cachedLocation;
+            }
+          } catch (error) {
+            console.log('Location not available, using default NYC');
+          }
+        } else {
+          userLocation = cachedLocation;
+        }
+        
+        // Fetch real weather data using Open-Meteo API (free, no key needed)
+        let weatherData = { temp: 72, condition: '🌤️ Sunny', icon: '☀️' };
+        if (coords) {
+          try {
+            const weatherResponse = await fetch(
+              `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current_weather=true&temperature_unit=fahrenheit`
+            );
+            const weather = await weatherResponse.json();
+            
+            if (weather.current_weather) {
+              const temp = Math.round(weather.current_weather.temperature);
+              const weatherCode = weather.current_weather.weathercode;
+              
+              // Map weather codes to conditions
+              const weatherConditions = {
+                0: { condition: '☀️ Clear', icon: '☀️' },
+                1: { condition: '🌤️ Mostly Clear', icon: '🌤️' },
+                2: { condition: '⛅ Partly Cloudy', icon: '⛅' },
+                3: { condition: '☁️ Cloudy', icon: '☁️' },
+                45: { condition: '🌫️ Foggy', icon: '🌫️' },
+                48: { condition: '🌫️ Foggy', icon: '🌫️' },
+                51: { condition: '🌦️ Light Rain', icon: '🌦️' },
+                61: { condition: '🌧️ Rain', icon: '🌧️' },
+                71: { condition: '🌨️ Snow', icon: '🌨️' },
+                95: { condition: '⛈️ Thunderstorm', icon: '⛈️' }
+              };
+              
+              const weatherInfo = weatherConditions[weatherCode] || { condition: '🌤️ Partly Cloudy', icon: '⛅' };
+              weatherData = { temp, condition: weatherInfo.condition, icon: weatherInfo.icon };
+            }
+          } catch (error) {
+            console.log('Weather API failed, using default');
+          }
+        }
+        
+        // Update static weather display with real data
+        document.getElementById('weather-temp').textContent = `${weatherData.temp}°F`;
+        document.getElementById('weather-condition').textContent = weatherData.condition;
+        document.getElementById('weather-location').textContent = `📍 ${userLocation}`;
+        
+        // Generate location-specific events
+        const isNYC = userLocation.includes('New York');
+        const events = [];
+        
+        if (isNYC) {
+          // NYC-specific events
+          events.push(
+            { icon: '🎭', text: 'Broadway Show: Hamilton - Richard Rodgers Theatre 8 PM' },
+            { icon: '🗽', text: 'Statue of Liberty Tours - Departing every hour from Battery Park' },
+            { icon: '🎨', text: 'MoMA Exhibition: Modern Masters - Open until 9 PM' },
+            { icon: '⚽', text: 'Yankees Game Tonight - Yankee Stadium 7:30 PM' },
+            { icon: '🎵', text: `${dayOfWeek} Live Jazz - Blue Note Jazz Club 9 PM` },
+            { icon: '🍕', text: "Best Pizza Tour - Little Italy & Brooklyn" }
+          );
+        } else {
+          // Generic hotel events for any location
+          events.push(
+            { icon: '🎭', text: `Check Local Theater Performances Tonight` },
+            { icon: '🎨', text: 'Visit Local Museums & Art Galleries' },
+            { icon: '🍽️', text: 'Explore Downtown Restaurants & Cafes' },
+            { icon: '🏛️', text: 'Historical Sites & City Tours Available' },
+            { icon: '🎵', text: `${dayOfWeek} Live Music - Ask Concierge for Recommendations` },
+            { icon: '🚶', text: 'Walking Tours & Local Attractions' }
+          );
+        }
+        
+        // Add time-based hotel events (works anywhere)
+        events.push(
+          { icon: '🍽️', text: hour < 19 ? 'Happy Hour 5-7 PM - Hotel Rooftop Bar' : 'Late Night Menu - Hotel Restaurant until 2 AM' },
+          { icon: '🏃', text: hour < 7 ? 'Morning Yoga Class - Hotel Gym 7 AM' : 'Evening Fitness Class - Hotel Gym 6 PM' },
+          { icon: '🛎️', text: 'Concierge Services Available 24/7' },
+          { icon: '🚕', text: 'Express Taxi Service - Ask Front Desk' }
+        );
+        
+        // Build rolling events HTML (duplicate for seamless loop)
+        const eventsHTML = [...events, ...events].map(e => 
+          `<div class="ticker-item"><span class="ticker-icon">${e.icon}</span>${e.text}</div>`
+        ).join('');
+        
+        document.getElementById('ticker-content').innerHTML = eventsHTML;
+      } catch (error) {
+        console.error('Failed to update ticker:', error);
+      }
+    }
+
+    // Update ticker on load and every 60 seconds
+    updateTicker();
+    setInterval(updateTicker, 60000);
   </script>
 </body>
 </html>
