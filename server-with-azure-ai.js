@@ -16,6 +16,7 @@ const USAGE_LOG_PATH = path.join(__dirname, 'usage.log.jsonl');
 const { AzureOpenAI } = require('openai');
 const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/identity');
 const { CosmosClient } = require('@azure/cosmos');
+const auth = require('./auth');
 
 // Load data files relative to this script directory to avoid CWD issues
 let qna = [];
@@ -70,7 +71,19 @@ try {
 
 const PORT = process.env.PORT || 3000;
 
-// ============================================
+// --- Authentication middleware ---
+function requireAuth(req, res, next) {
+  const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.body.sessionToken;
+  const session = auth.verifySession(sessionToken);
+
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized - Invalid or expired session' });
+  }
+
+  req.session = session;
+  req.sessionToken = sessionToken;
+  next();
+}
 // COSMOS DB SETUP FOR TICKETING
 // ============================================
 
@@ -1930,7 +1943,7 @@ ${locationContext}${profileContext}${onboardingPrompt}
 // MAIN API ENDPOINT
 // ============================================
 
-app.post('/api/message', async (req, res) => {
+app.post('/api/message', requireAuth, async (req, res) => {
   try {
     const { sessionId = 'anon', message = '', consentLocation = false, coords, city, conversationHistory = [] } = req.body;
 
@@ -2257,6 +2270,84 @@ app.get('/api/analytics', (req, res) => {
 // Serve analytics dashboard
 app.get('/analytics', (req, res) => {
   res.sendFile(path.join(__dirname, 'analytics-dashboard.html'));
+});
+
+// --- AUTHENTICATION ENDPOINTS ---
+
+app.post('/api/login', (req, res) => {
+  try {
+    const { persona, roomNumber, guestName, staffId, password } = req.body;
+
+    if (!persona) {
+      return res.status(400).json({ error: 'Persona (guest/staff) is required' });
+    }
+
+    if (persona === 'guest') {
+      // Guest login
+      if (!roomNumber || !guestName) {
+        return res.status(400).json({ error: 'Room number and name are required' });
+      }
+
+      const result = auth.createGuestSession(roomNumber, guestName);
+      return res.json(result);
+    } else if (persona === 'staff') {
+      // Staff login
+      if (!staffId || !password) {
+        return res.status(400).json({ error: 'Employee ID and password are required' });
+      }
+
+      const verification = auth.verifyStaffCredentials(staffId, password);
+      if (!verification.valid) {
+        return res.status(401).json({ error: verification.error || 'Invalid credentials' });
+      }
+
+      const result = auth.createStaffSession(staffId);
+      return res.json(result);
+    } else {
+      return res.status(400).json({ error: 'Invalid persona' });
+    }
+  } catch (err) {
+    console.error('Login error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/logout', requireAuth, (req, res) => {
+  try {
+    const sessionToken = req.sessionToken;
+    auth.destroySession(sessionToken);
+    return res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Logout error:', err);
+    return res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+app.post('/api/verify-session', (req, res) => {
+  try {
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.body.sessionToken;
+    const session = auth.verifySession(sessionToken);
+
+    if (!session) {
+      return res.status(401).json({ valid: false, error: 'Invalid or expired session' });
+    }
+
+    return res.json({ valid: true, session });
+  } catch (err) {
+    console.error('Session verification error:', err);
+    return res.status(500).json({ error: 'Session verification failed' });
+  }
+});
+
+app.get('/api/sessions', requireAuth, (req, res) => {
+  // Only staff can view all sessions (optional authorization check)
+  try {
+    const allSessions = auth.getAllSessions();
+    return res.json({ sessions: allSessions, total: allSessions.length });
+  } catch (err) {
+    console.error('Get sessions error:', err);
+    return res.status(500).json({ error: 'Failed to retrieve sessions' });
+  }
 });
 
 app.listen(PORT, async () => {
