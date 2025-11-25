@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Staff Dashboard - AI Concierge</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+    }
+
+    .dashboard-container {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 250px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 24px;
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .sidebar-logo {
+      font-size: 32px;
+    }
+
+    .sidebar-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .sidebar-subtitle {
+      font-size: 11px;
+      opacity: 0.8;
+      margin: 0;
+    }
+
+    .sidebar-nav {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar-nav li {
+      margin-bottom: 8px;
+    }
+
+    .sidebar-nav a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .sidebar-nav a:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .sidebar-nav a.active {
+      background: rgba(255, 255, 255, 0.2);
+      font-weight: 600;
+    }
+
+    .sidebar-nav-icon {
+      font-size: 20px;
+    }
+
+    .sidebar-footer {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      right: 24px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .logout-btn {
+      width: 100%;
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .logout-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Main Content */
+    .main-content {
+      margin-left: 250px;
+      flex: 1;
+      padding: 32px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-title {
+      font-size: 28px;
+      font-weight: 600;
+      color: #333;
+      margin: 0;
+    }
+
+    .header-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #f0f2ff;
+      border-radius: 6px;
+      color: #667eea;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin: 0 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-icon {
+      font-size: 24px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .stat-item {
+      background: #f8f9ff;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 3px solid #667eea;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .tickets-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    .tickets-table th {
+      background: #f8f9ff;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 2px solid #e0e4ff;
+      font-size: 13px;
+    }
+
+    .tickets-table td {
+      padding: 12px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+
+    .ticket-status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-open {
+      background: #ffe0e0;
+      color: #c00;
+    }
+
+    .status-in-progress {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .status-completed {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .activity-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .activity-item {
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .activity-item:last-child {
+      border-bottom: none;
+    }
+
+    .activity-icon {
+      font-size: 20px;
+      margin-top: 2px;
+    }
+
+    .activity-content {
+      flex: 1;
+    }
+
+    .activity-title {
+      font-weight: 600;
+      color: #333;
+      font-size: 13px;
+    }
+
+    .activity-time {
+      font-size: 11px;
+      color: #999;
+      margin-top: 4px;
+    }
+
+    .alert-box {
+      background: #f0f2ff;
+      border-left: 3px solid #667eea;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: #333;
+    }
+
+    .quick-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .action-button {
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .action-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 32px;
+      color: #999;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 60px;
+      }
+
+      .sidebar-title,
+      .sidebar-subtitle {
+        display: none;
+      }
+
+      .main-content {
+        margin-left: 60px;
+      }
+
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">👨‍💼</div>
+        <div>
+          <h1 class="sidebar-title">Staff Hub</h1>
+          <p class="sidebar-subtitle">Management Portal</p>
+        </div>
+      </div>
+
+      <ul class="sidebar-nav">
+        <li><a href="#" class="active" onclick="showSection('overview')"><span class="sidebar-nav-icon">📊</span> Overview</a></li>
+        <li><a href="#" onclick="showSection('tickets')"><span class="sidebar-nav-icon">🎫</span> Open Tickets</a></li>
+        <li><a href="#" onclick="showSection('guests')"><span class="sidebar-nav-icon">👥</span> Guest Sessions</a></li>
+        <li><a href="#" onclick="showSection('activity')"><span class="sidebar-nav-icon">📈</span> Activity Log</a></li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="handleLogout()">Logout</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Header -->
+      <div class="header">
+        <h1 class="header-title" id="section-title">Welcome back!</h1>
+        <div class="header-info">
+          <div class="user-badge">
+            <span id="staff-badge">👨‍💼 Front Desk</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overview Section -->
+      <div id="overview-section" class="section-content">
+        <div class="content-grid">
+          <!-- Quick Stats -->
+          <div class="card">
+            <h2 class="card-title"><span class="card-icon">📊</span> Dashboard Stats</h2>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-label">Active Sessions</div>
+                <div class="stat-value" id="active-sessions">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Open Tickets</div>
+                <div class="stat-value" id="open-tickets">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Completed Today</div>
+                <div class="stat-value" id="completed-today">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Response Time</div>
+                <div class="stat-value" id="response-time">2m</div>
+              </div>
+            </div>
+            <div class="alert-box">
+              ℹ️ All systems operational. Last updated: <span id="last-updated">now</span>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card">
+            <h2 class="card-title"><span class="card-icon">📈</span> Recent Activity</h2>
+            <ul class="activity-list" id="activity-feed">
+              <li class="activity-item">
+                <div class="activity-icon">✅</div>
+                <div class="activity-content">
+                  <div class="activity-title">Housekeeping ticket completed</div>
+                  <div class="activity-time">5 minutes ago</div>
+                </div>
+              </li>
+              <li class="activity-item">
+                <div class="activity-icon">👤</div>
+                <div class="activity-content">
+                  <div class="activity-title">New guest session: Room 209</div>
+                  <div class="activity-time">12 minutes ago</div>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="card">
+            <h2 class="card-title"><span class="card-icon">⚡</span> Quick Actions</h2>
+            <div class="quick-actions-grid">
+              <button class="action-button" onclick="alert('Create ticket feature coming soon')">
+                <span>🎫</span> Create Ticket
+              </button>
+              <button class="action-button" onclick="alert('Message guest feature coming soon')">
+                <span>💬</span> Message Guest
+              </button>
+              <button class="action-button" onclick="alert('View reports feature coming soon')">
+                <span>📋</span> View Reports
+              </button>
+              <button class="action-button" onclick="alert('Settings coming soon')">
+                <span>⚙️</span> Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tickets Section -->
+      <div id="tickets-section" class="section-content" style="display: none;">
+        <div class="card">
+          <h2 class="card-title"><span class="card-icon">🎫</span> Open Tickets</h2>
+          <table class="tickets-table">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Room</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="tickets-list">
+              <tr>
+                <td colspan="5" style="text-align: center; color: #999; padding: 32px;">
+                  Loading tickets...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Guest Sessions Section -->
+      <div id="guests-section" class="section-content" style="display: none;">
+        <div class="card">
+          <h2 class="card-title"><span class="card-icon">👥</span> Active Guest Sessions</h2>
+          <table class="tickets-table">
+            <thead>
+              <tr>
+                <th>Room</th>
+                <th>Guest Name</th>
+                <th>Session ID</th>
+                <th>Status</th>
+                <th>Logged In</th>
+              </tr>
+            </thead>
+            <tbody id="sessions-list">
+              <tr>
+                <td colspan="5" style="text-align: center; color: #999; padding: 32px;">
+                  Loading sessions...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Activity Log Section -->
+      <div id="activity-section" class="section-content" style="display: none;">
+        <div class="card">
+          <h2 class="card-title"><span class="card-icon">📈</span> Activity Log</h2>
+          <ul class="activity-list" id="full-activity-list">
+            <li class="activity-item">
+              <div class="activity-icon">👤</div>
+              <div class="activity-content">
+                <div class="activity-title">Guest logged in: Room 209 - John Smith</div>
+                <div class="activity-time">2025-11-24 10:30 AM</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let sessionToken = null;
+    let staffInfo = null;
+    let userPersona = null;
+
+    async function initializeStaffDashboard() {
+      // Check if user is logged in
+      sessionToken = localStorage.getItem('sessionToken');
+      userPersona = localStorage.getItem('userPersona');
+      staffInfo = localStorage.getItem('userInfo');
+
+      if (!sessionToken || userPersona !== 'staff') {
+        // Not logged in as staff, redirect to login page
+        window.location.href = 'login.html';
+        return;
+      }
+
+      try {
+        // Verify session with server
+        const response = await fetch('http://localhost:3000/api/verify-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + sessionToken
+          }
+        });
+
+        if (!response.ok) {
+          // Session is invalid
+          localStorage.clear();
+          window.location.href = 'login.html';
+          return;
+        }
+
+        const data = await response.json();
+        updateStaffInfo(data.session);
+        loadDashboardData();
+      } catch (error) {
+        console.error('Session verification failed:', error);
+        localStorage.clear();
+        window.location.href = 'login.html';
+      }
+    }
+
+    function updateStaffInfo(session) {
+      try {
+        const info = JSON.parse(staffInfo || '{}');
+        const deptLabel = {
+          'front-desk': '🛎️ Front Desk',
+          'housekeeping': '🧹 Housekeeping',
+          'maintenance': '🔧 Maintenance',
+          'room-service': '🍽️ Room Service'
+        }[info.department] || '🛎️ Staff';
+
+        document.getElementById('staff-badge').textContent = deptLabel;
+      } catch (error) {
+        console.error('Error updating staff info:', error);
+      }
+    }
+
+    async function loadDashboardData() {
+      try {
+        // Simulate loading data
+        document.getElementById('active-sessions').textContent = '12';
+        document.getElementById('open-tickets').textContent = '7';
+        document.getElementById('completed-today').textContent = '18';
+        document.getElementById('response-time').textContent = '2m';
+        document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      }
+    }
+
+    function showSection(section) {
+      // Hide all sections
+      document.querySelectorAll('.section-content').forEach(el => {
+        el.style.display = 'none';
+      });
+
+      // Remove active class from nav items
+      document.querySelectorAll('.sidebar-nav a').forEach(link => {
+        link.classList.remove('active');
+      });
+
+      // Show selected section
+      const sectionMap = {
+        'overview': 'overview-section',
+        'tickets': 'tickets-section',
+        'guests': 'guests-section',
+        'activity': 'activity-section'
+      };
+
+      const titleMap = {
+        'overview': '📊 Dashboard Overview',
+        'tickets': '🎫 Open Tickets',
+        'guests': '👥 Active Guest Sessions',
+        'activity': '📈 Activity Log'
+      };
+
+      document.getElementById(sectionMap[section]).style.display = 'block';
+      document.getElementById('section-title').textContent = titleMap[section];
+
+      // Add active class to clicked nav item
+      event.target.closest('a').classList.add('active');
+    }
+
+    async function handleLogout() {
+      try {
+        await fetch('http://localhost:3000/api/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + sessionToken
+          }
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+
+      // Clear local storage
+      localStorage.clear();
+
+      // Redirect to login page
+      window.location.href = 'login.html';
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeStaffDashboard();
+    });
+  </script>
+</body>
+</html>

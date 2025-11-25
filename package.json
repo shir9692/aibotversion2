@@ -2,11 +2,11 @@
   "name": "ai-concierge-mvp",
   "version": "0.2.0",
   "description": "AI Concierge with Azure OpenAI Agent Integration",
-  "main": "server-with-azure-ai.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node server-with-azure-ai.js",
-    "start:original": "node server.js",
-    "dev": "node server-with-azure-ai.js"
+    "start": "node server.js",
+    "start:azure": "node server-with-azure-ai.js",
+    "dev": "node server.js"
   },
   "dependencies": {
     "@azure/cosmos": "^4.7.0",

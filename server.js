@@ -8,6 +8,7 @@ const fetch = require('node-fetch');
 const cors = require('cors');
 const fs = require('fs');
 const Fuse = require('fuse.js');
+const auth = require('./auth');
 
 // (No DB connection here in this original server file)
 
@@ -25,6 +26,20 @@ const PORT = process.env.PORT || 3000;
 
 // Simple in-memory session tracking for single-active-request enforcement
 const activeRequests = new Map();
+
+// --- Authentication middleware ---
+function requireAuth(req, res, next) {
+  const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.body.sessionToken;
+  const session = auth.verifySession(sessionToken);
+
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized - Invalid or expired session' });
+  }
+
+  req.session = session;
+  req.sessionToken = sessionToken;
+  next();
+}
 
 // --- fuzzy QnA (Fuse.js) setup with improved matching and debug logging ---
 const fuseOptions = {
@@ -330,7 +345,7 @@ function detectIntent(text) {
   return 'unknown';
 }
 
-app.post('/api/message', async (req, res) => {
+app.post('/api/message', requireAuth, async (req, res) => {
   try {
     const { sessionId = 'anon', message = '', consentLocation = false, coords, city } = req.body;
 
@@ -410,4 +425,82 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
   console.log(`AI Concierge prototype listening on http://localhost:${PORT}`);
+});
+
+// --- AUTHENTICATION ENDPOINTS ---
+
+app.post('/api/login', (req, res) => {
+  try {
+    const { persona, roomNumber, guestName, staffId, password } = req.body;
+
+    if (!persona) {
+      return res.status(400).json({ error: 'Persona (guest/staff) is required' });
+    }
+
+    if (persona === 'guest') {
+      // Guest login
+      if (!roomNumber || !guestName) {
+        return res.status(400).json({ error: 'Room number and name are required' });
+      }
+
+      const result = auth.createGuestSession(roomNumber, guestName);
+      return res.json(result);
+    } else if (persona === 'staff') {
+      // Staff login
+      if (!staffId || !password) {
+        return res.status(400).json({ error: 'Employee ID and password are required' });
+      }
+
+      const verification = auth.verifyStaffCredentials(staffId, password);
+      if (!verification.valid) {
+        return res.status(401).json({ error: verification.error || 'Invalid credentials' });
+      }
+
+      const result = auth.createStaffSession(staffId);
+      return res.json(result);
+    } else {
+      return res.status(400).json({ error: 'Invalid persona' });
+    }
+  } catch (err) {
+    console.error('Login error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/logout', requireAuth, (req, res) => {
+  try {
+    const sessionToken = req.sessionToken;
+    auth.destroySession(sessionToken);
+    return res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Logout error:', err);
+    return res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+app.post('/api/verify-session', (req, res) => {
+  try {
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.body.sessionToken;
+    const session = auth.verifySession(sessionToken);
+
+    if (!session) {
+      return res.status(401).json({ valid: false, error: 'Invalid or expired session' });
+    }
+
+    return res.json({ valid: true, session });
+  } catch (err) {
+    console.error('Session verification error:', err);
+    return res.status(500).json({ error: 'Session verification failed' });
+  }
+});
+
+app.get('/api/sessions', requireAuth, (req, res) => {
+  // Only staff can view all sessions (optional authorization check)
+  try {
+    const allSessions = auth.getAllSessions();
+    return res.json({ sessions: allSessions, total: allSessions.length });
+  } catch (err) {
+    console.error('Get sessions error:', err);
+    return res.status(500).json({ error: 'Failed to retrieve sessions' });
+  }
 });

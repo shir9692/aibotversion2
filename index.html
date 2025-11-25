@@ -346,6 +346,15 @@
     <div id="chat">
       <!-- Weather & Events Ticker -->
       <div class="ticker-container">
+        <!-- User Profile & Logout Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.3); margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="user-avatar" style="font-size: 20px;">👤</span>
+            <span id="user-info" style="font-size: 12px; opacity: 0.9;">Guest</span>
+          </div>
+          <button onclick="handleLogout()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">Logout</button>
+        </div>
+
         <!-- Static Weather Section -->
         <div class="weather-section">
           <div class="weather-info">
@@ -494,6 +503,86 @@
     let cachedLocation = null;
     const sessionId = 'session-' + Math.random().toString(36).slice(2,9);
     const conversationHistory = [];
+    let sessionToken = null;
+    let userPersona = null;
+    let userInfo = null;
+
+    // Initialize session on page load
+    async function initializeSession() {
+      // Check if user is logged in
+      sessionToken = localStorage.getItem('sessionToken');
+      userPersona = localStorage.getItem('userPersona');
+      userInfo = localStorage.getItem('userInfo');
+
+      if (!sessionToken) {
+        // Not logged in, redirect to login page
+        window.location.href = 'login.html';
+        return;
+      }
+
+      try {
+        // Verify session with server
+        const response = await fetch('http://localhost:3000/api/verify-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + sessionToken
+          }
+        });
+
+        if (!response.ok) {
+          // Session is invalid
+          localStorage.clear();
+          window.location.href = 'login.html';
+          return;
+        }
+
+        // Session is valid, update UI
+        updateUserInfo();
+      } catch (error) {
+        console.error('Session verification failed:', error);
+        localStorage.clear();
+        window.location.href = 'login.html';
+      }
+    }
+
+    function updateUserInfo() {
+      try {
+        const info = JSON.parse(userInfo || '{}');
+        const avatar = document.getElementById('user-avatar');
+        const userDisplay = document.getElementById('user-info');
+
+        if (userPersona === 'guest') {
+          avatar.textContent = '👤';
+          userDisplay.textContent = `${info.guestName || 'Guest'} | Room ${info.roomNumber || '?'}`;
+        } else if (userPersona === 'staff') {
+          avatar.textContent = '👨‍💼';
+          userDisplay.textContent = `${info.staffName || 'Staff'} (Employee)`;
+        }
+      } catch (error) {
+        console.error('Error updating user info:', error);
+      }
+    }
+
+    async function handleLogout() {
+      try {
+        await fetch('http://localhost:3000/api/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + sessionToken
+          }
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+
+      // Clear local storage
+      localStorage.clear();
+
+      // Redirect to login page
+      window.location.href = 'login.html';
+    }
 
     function append(text, who='bot') {
       const d = document.createElement('div');
@@ -569,14 +658,25 @@
         }
       }
 
-      const payload = { sessionId, message: text, consentLocation, coords, conversationHistory };
+      const payload = { sessionId, message: text, consentLocation, coords, conversationHistory, sessionToken };
 
       try {
         const r = await fetch('http://localhost:3000/api/message', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + sessionToken
+          },
           body: JSON.stringify(payload)
         });
+
+        if (r.status === 401) {
+          // Session expired
+          localStorage.clear();
+          window.location.href = 'login.html';
+          return;
+        }
+
         const json = await r.json();
 
         srvIntentEl.innerText = json.intent || '""';
@@ -635,13 +735,17 @@
       try {
         const response = await fetch('http://localhost:3000/api/message', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + sessionToken
+          },
           body: JSON.stringify({
             sessionId,
             message: `Create a ticket for ${requestType}. Room ${roomNumber}. Details: ${details || 'No specific details'}`,
             consentLocation: false,
             coords: null,
-            conversationHistory
+            conversationHistory,
+            sessionToken
           })
         });
         
@@ -689,9 +793,12 @@
     // Initial greeting
     append('Hello! Welcome to AI Concierge. How can I help you today?');
 
-    // Fetch analytics on load and every 5 seconds
-    fetchAnalytics();
-    setInterval(fetchAnalytics, 5000);
+    // Initialize session and then fetch analytics
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeSession();
+      fetchAnalytics();
+      setInterval(fetchAnalytics, 5000);
+    });
 
     // Update weather and events ticker
     async function updateTicker() {
