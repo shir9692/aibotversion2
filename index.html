@@ -339,6 +339,102 @@
     .ticker-content:hover {
       animation-play-state: paused;
     }
+    .ticker-item {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .ticker-item:hover {
+      transform: scale(1.05);
+      text-shadow: 0 0 8px rgba(255,255,255,0.5);
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.3s ease;
+    }
+    .modal.active {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .modal-content {
+      background-color: white;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      animation: slideUp 0.3s ease;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 12px;
+    }
+    .modal-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: #999;
+      transition: color 0.2s;
+    }
+    .close-btn:hover {
+      color: #333;
+    }
+    .modal-body {
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .modal-btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .modal-btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .modal-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .modal-btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+    .modal-btn-secondary:hover {
+      background: #e0e0e0;
+    }
   </style>
 </head>
 <body>
@@ -485,6 +581,27 @@
     </div>
   </div>
 
+  <!-- Event Modal -->
+  <div id="event-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span id="event-icon"></span>
+          <span id="event-title"></span>
+        </div>
+        <button class="close-btn" onclick="closeEventModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="event-description"></p>
+        <div id="event-details" style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 13px;"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-secondary" onclick="closeEventModal()">Close</button>
+        <button class="modal-btn modal-btn-primary" onclick="addEventToChat()">Ask Concierge</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const historyEl = document.getElementById('history');
     const inputEl = document.getElementById('message');
@@ -506,6 +623,48 @@
     let sessionToken = null;
     let userPersona = null;
     let userInfo = null;
+    let currentEventData = null;
+
+    // Event Modal Functions
+    function openEventModal(eventData) {
+      currentEventData = eventData;
+      document.getElementById('event-icon').textContent = eventData.icon;
+      document.getElementById('event-title').textContent = eventData.title;
+      document.getElementById('event-description').textContent = eventData.description;
+      
+      let detailsHtml = '';
+      if (eventData.details) {
+        detailsHtml = eventData.details.map(detail => `<div style="margin: 6px 0;"><strong>${detail.label}:</strong> ${detail.value}</div>`).join('');
+      }
+      document.getElementById('event-details').innerHTML = detailsHtml || '<em>No additional details available</em>';
+      
+      document.getElementById('event-modal').classList.add('active');
+    }
+
+    function closeEventModal() {
+      document.getElementById('event-modal').classList.remove('active');
+      currentEventData = null;
+    }
+
+    function addEventToChat() {
+      if (!currentEventData) return;
+      
+      const message = `I'm interested in: ${currentEventData.title}. Can you help me with more information or bookings?`;
+      sendMessage(message);
+      closeEventModal();
+    }
+
+    function handleEventClick(eventData) {
+      openEventModal(eventData);
+    }
+
+    // Close modal when clicking outside
+    document.addEventListener('click', (e) => {
+      const modal = document.getElementById('event-modal');
+      if (e.target === modal) {
+        closeEventModal();
+      }
+    });
 
     // Initialize session on page load
     async function initializeSession() {
@@ -894,36 +1053,203 @@
         if (isNYC) {
           // NYC-specific events
           events.push(
-            { icon: '🎭', text: 'Broadway Show: Hamilton - Richard Rodgers Theatre 8 PM' },
-            { icon: '🗽', text: 'Statue of Liberty Tours - Departing every hour from Battery Park' },
-            { icon: '🎨', text: 'MoMA Exhibition: Modern Masters - Open until 9 PM' },
-            { icon: '⚽', text: 'Yankees Game Tonight - Yankee Stadium 7:30 PM' },
-            { icon: '🎵', text: `${dayOfWeek} Live Jazz - Blue Note Jazz Club 9 PM` },
-            { icon: '🍕', text: "Best Pizza Tour - Little Italy & Brooklyn" }
+            { 
+              icon: '🎭', 
+              title: 'Broadway Show: Hamilton',
+              text: 'Broadway Show: Hamilton - Richard Rodgers Theatre 8 PM',
+              description: 'Experience the critically acclaimed musical Hamilton at the Richard Rodgers Theatre.',
+              details: [
+                { label: 'Location', value: 'Richard Rodgers Theatre, Times Square' },
+                { label: 'Time', value: '8:00 PM' },
+                { label: 'Duration', value: '2 hours 45 minutes' },
+                { label: 'Price Range', value: '$$ - $$$' }
+              ]
+            },
+            { 
+              icon: '🗽', 
+              title: 'Statue of Liberty Tours',
+              text: 'Statue of Liberty Tours - Departing every hour from Battery Park',
+              description: 'Visit one of America\'s most iconic monuments with guided tours.',
+              details: [
+                { label: 'Location', value: 'Battery Park, Downtown Manhattan' },
+                { label: 'Departures', value: 'Every hour, 9 AM - 5 PM' },
+                { label: 'Duration', value: '3-4 hours' },
+                { label: 'Price', value: '$24.50 per adult' }
+              ]
+            },
+            { 
+              icon: '🎨', 
+              title: 'MoMA Exhibition: Modern Masters',
+              text: 'MoMA Exhibition: Modern Masters - Open until 9 PM',
+              description: 'Explore world-class modern and contemporary art at the Museum of Modern Art.',
+              details: [
+                { label: 'Location', value: 'Museum of Modern Art, Midtown' },
+                { label: 'Hours', value: '10:30 AM - 9:00 PM' },
+                { label: 'Admission', value: '$25 general admission' },
+                { label: 'Highlights', value: 'Picasso, Warhol, Van Gogh' }
+              ]
+            },
+            { 
+              icon: '⚽', 
+              title: 'Yankees Game Tonight',
+              text: 'Yankees Game Tonight - Yankee Stadium 7:30 PM',
+              description: 'Catch the New York Yankees in action at historic Yankee Stadium.',
+              details: [
+                { label: 'Location', value: 'Yankee Stadium, Bronx' },
+                { label: 'Time', value: '7:30 PM' },
+                { label: 'Opponent', value: 'Boston Red Sox' },
+                { label: 'Tickets', value: 'Available at box office' }
+              ]
+            },
+            { 
+              icon: '🎵', 
+              title: `${dayOfWeek} Live Jazz`,
+              text: `${dayOfWeek} Live Jazz - Blue Note Jazz Club 9 PM`,
+              description: 'Enjoy world-class live jazz performances at the legendary Blue Note.',
+              details: [
+                { label: 'Location', value: 'Blue Note Jazz Club, Greenwich Village' },
+                { label: 'Time', value: '9:00 PM' },
+                { label: 'Cover Charge', value: '$20 - $40' },
+                { label: 'Reservations', value: 'Recommended' }
+              ]
+            },
+            { 
+              icon: '🍕', 
+              title: 'Best Pizza Tour',
+              text: 'Best Pizza Tour - Little Italy & Brooklyn',
+              description: 'Taste authentic New York pizza at the city\'s most famous pizzerias.',
+              details: [
+                { label: 'Duration', value: '2.5 hours' },
+                { label: 'Includes', value: '3-4 pizza slices + toppings' },
+                { label: 'Price', value: '$65 per person' },
+                { label: 'Neighborhoods', value: 'Little Italy & Brooklyn' }
+              ]
+            }
           );
         } else {
           // Generic hotel events for any location
           events.push(
-            { icon: '🎭', text: `Check Local Theater Performances Tonight` },
-            { icon: '🎨', text: 'Visit Local Museums & Art Galleries' },
-            { icon: '🍽️', text: 'Explore Downtown Restaurants & Cafes' },
-            { icon: '🏛️', text: 'Historical Sites & City Tours Available' },
-            { icon: '🎵', text: `${dayOfWeek} Live Music - Ask Concierge for Recommendations` },
-            { icon: '🚶', text: 'Walking Tours & Local Attractions' }
+            { 
+              icon: '🎭', 
+              title: 'Local Theater',
+              text: 'Check Local Theater Performances Tonight',
+              description: 'Discover local theatrical performances and live shows in the area.',
+              details: [
+                { label: 'Type', value: 'Theater & Live Performances' },
+                { label: 'Availability', value: 'Various times' },
+                { label: 'Ask Concierge', value: 'For personalized recommendations' }
+              ]
+            },
+            { 
+              icon: '🎨', 
+              title: 'Museums & Art Galleries',
+              text: 'Visit Local Museums & Art Galleries',
+              description: 'Explore world-class art and cultural institutions nearby.',
+              details: [
+                { label: 'Type', value: 'Museums & Galleries' },
+                { label: 'Variety', value: 'Modern, Classical, Contemporary' },
+                { label: 'Ask Concierge', value: 'For recommendations based on your interests' }
+              ]
+            },
+            { 
+              icon: '🍽️', 
+              title: 'Downtown Dining',
+              text: 'Explore Downtown Restaurants & Cafes',
+              description: 'Discover the finest dining experiences in the area.',
+              details: [
+                { label: 'Cuisines', value: 'International & Local' },
+                { label: 'Price Range', value: '$ - $$$' },
+                { label: 'Ask Concierge', value: 'For reservations & recommendations' }
+              ]
+            },
+            { 
+              icon: '🏛️', 
+              title: 'Historical Sites',
+              text: 'Historical Sites & City Tours Available',
+              description: 'Learn about the rich history of this city through guided tours.',
+              details: [
+                { label: 'Types', value: 'Walking Tours, Bus Tours' },
+                { label: 'Duration', value: '2-4 hours' },
+                { label: 'Ask Concierge', value: 'For booking & information' }
+              ]
+            },
+            { 
+              icon: '🎵', 
+              title: `${dayOfWeek} Live Music`,
+              text: `${dayOfWeek} Live Music - Ask Concierge for Recommendations`,
+              description: 'Enjoy live music performances at local venues.',
+              details: [
+                { label: 'Genres', value: 'Jazz, Rock, Classical, Pop' },
+                { label: 'Venues', value: 'Various throughout the city' },
+                { label: 'Ask Concierge', value: 'For tonight\'s performances' }
+              ]
+            },
+            { 
+              icon: '🚶', 
+              title: 'Walking Tours',
+              text: 'Walking Tours & Local Attractions',
+              description: 'Explore the city on foot with guided neighborhood tours.',
+              details: [
+                { label: 'Routes', value: 'Multiple themed tours available' },
+                { label: 'Duration', value: '2-3 hours' },
+                { label: 'Ask Concierge', value: 'For available tours' }
+              ]
+            }
           );
         }
         
         // Add time-based hotel events (works anywhere)
         events.push(
-          { icon: '🍽️', text: hour < 19 ? 'Happy Hour 5-7 PM - Hotel Rooftop Bar' : 'Late Night Menu - Hotel Restaurant until 2 AM' },
-          { icon: '🏃', text: hour < 7 ? 'Morning Yoga Class - Hotel Gym 7 AM' : 'Evening Fitness Class - Hotel Gym 6 PM' },
-          { icon: '🛎️', text: 'Concierge Services Available 24/7' },
-          { icon: '🚕', text: 'Express Taxi Service - Ask Front Desk' }
+          { 
+            icon: '🍽️', 
+            title: hour < 19 ? 'Happy Hour' : 'Late Night Menu',
+            text: hour < 19 ? 'Happy Hour 5-7 PM - Hotel Rooftop Bar' : 'Late Night Menu - Hotel Restaurant until 2 AM',
+            description: hour < 19 ? 'Enjoy discounted drinks and appetizers at our rooftop bar.' : 'Order from our late-night menu available until 2 AM.',
+            details: [
+              { label: 'Location', value: hour < 19 ? 'Hotel Rooftop Bar' : 'Hotel Restaurant' },
+              { label: 'Hours', value: hour < 19 ? '5:00 PM - 7:00 PM' : '11:00 PM - 2:00 AM' },
+              { label: 'Call Extension', value: '2050' }
+            ]
+          },
+          { 
+            icon: '🏃', 
+            title: hour < 7 ? 'Morning Yoga' : 'Evening Fitness',
+            text: hour < 7 ? 'Morning Yoga Class - Hotel Gym 7 AM' : 'Evening Fitness Class - Hotel Gym 6 PM',
+            description: hour < 7 ? 'Start your day with a relaxing yoga session.' : 'Join our evening fitness class to stay active.',
+            details: [
+              { label: 'Location', value: 'Hotel Gym, Level 2' },
+              { label: 'Time', value: hour < 7 ? '7:00 AM' : '6:00 PM' },
+              { label: 'Duration', value: '45 minutes' },
+              { label: 'No Prior Booking', value: 'Drop-in welcome!' }
+            ]
+          },
+          { 
+            icon: '🛎️', 
+            title: 'Concierge Services',
+            text: 'Concierge Services Available 24/7',
+            description: 'Our concierge team is always available to assist with your needs.',
+            details: [
+              { label: 'Services', value: 'Reservations, Bookings, Recommendations' },
+              { label: 'Available', value: '24 hours, 7 days a week' },
+              { label: 'Reach Us', value: 'Dial 0 from your room or visit the lobby' }
+            ]
+          },
+          { 
+            icon: '🚕', 
+            title: 'Express Taxi Service',
+            text: 'Express Taxi Service - Ask Front Desk',
+            description: 'Need a ride? Our express taxi service is fast and reliable.',
+            details: [
+              { label: 'Response Time', value: 'Typically 5-10 minutes' },
+              { label: 'Available', value: '24 hours' },
+              { label: 'Book At', value: 'Front Desk or Call Extension 2000' }
+            ]
+          }
         );
         
-        // Build rolling events HTML (duplicate for seamless loop)
-        const eventsHTML = [...events, ...events].map(e => 
-          `<div class="ticker-item"><span class="ticker-icon">${e.icon}</span>${e.text}</div>`
+        // Build rolling events HTML with click handlers (duplicate for seamless loop)
+        const eventsHTML = [...events, ...events].map((e, idx) => 
+          `<div class="ticker-item" onclick="handleEventClick({icon: '${e.icon}', title: '${e.title.replace(/'/g, "\\'")}', description: '${e.description.replace(/'/g, "\\'")}', details: ${JSON.stringify(e.details).replace(/"/g, '&quot;')}})"><span class="ticker-icon">${e.icon}</span>${e.text}</div>`
         ).join('');
         
         document.getElementById('ticker-content').innerHTML = eventsHTML;
