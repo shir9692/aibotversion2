@@ -347,14 +347,6 @@
                     <p>No service requests yet.</p>
                 </div>
             </div>
-
-            <!-- Open Tickets Section for Staff -->
-            <h2 style="margin-top:32px;">🟢 All Open Tickets</h2>
-            <div id="open-tickets-list">
-                <div class="empty-state">
-                    <p>No open tickets.</p>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -398,46 +390,8 @@
                 // Render Guest Preferences
                 renderPreferences(data.insights.guestPreferences);
 
-                                // Render Service Requests
-                                renderServiceRequests(data.raw.serviceRequests);
-
-                                // Render Open Tickets for staff
-                                if (data.raw.openTickets && Array.isArray(data.raw.openTickets)) {
-                                    renderOpenTickets(data.raw.openTickets);
-                                }
-        // Render open tickets for staff
-        function renderOpenTickets(tickets) {
-            const container = document.getElementById('open-tickets-list');
-            if (!container) return;
-            if (!tickets || tickets.length === 0) {
-                container.innerHTML = '<div class="empty-state"><p>No open tickets.</p></div>';
-                return;
-            }
-            container.innerHTML = tickets.map(ticket => {
-                const statusBadge = ticket.status === 'resolved' ? 'badge-success' : 
-                                   ticket.status === 'open' ? 'badge-warning' : 'badge-info';
-                const priorityBadge = ticket.priority === 'High' || ticket.priority === 'Urgent' ? 
-                                     'badge-danger' : 'badge-info';
-                return `
-                    <div class="list-item">
-                        <div>
-                            <div class="list-item-title">${ticket.requestType} - ${ticket._id || ticket.ticketId}</div>
-                            <div style="color: #666; font-size: 13px; margin-top: 4px;">
-                                👤 ${ticket.guestName || 'Guest'} • 🚪 Room ${ticket.roomNumber || 'N/A'}
-                            </div>
-                            <div style="color: #888; font-size: 12px; margin-top: 2px;">
-                                ${ticket.description || 'No description'}
-                            </div>
-                            <span class="badge ${statusBadge}">${ticket.status}</span>
-                            <span class="badge ${priorityBadge}">${ticket.priority} priority</span>
-                        </div>
-                        <div style="text-align: right; color: #999; font-size: 12px;">
-                            ${ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
+                // Render Service Requests
+                renderServiceRequests(data.raw.serviceRequests);
 
             } catch (error) {
                 console.error('Failed to load analytics:', error);
@@ -559,12 +513,6 @@
                     <div class="list-item">
                         <div>
                             <div class="list-item-title">${request.type} - ${request.ticketId}</div>
-                            <div style="color: #666; font-size: 13px; margin-top: 4px;">
-                                👤 ${request.guestName || 'Guest'} • 🚪 Room ${request.roomNumber || 'N/A'}
-                            </div>
-                            <div style="color: #888; font-size: 12px; margin-top: 2px;">
-                                ${request.description || 'No description'}
-                            </div>
                             <span class="badge ${statusBadge}">${request.status}</span>
                             <span class="badge ${priorityBadge}">${request.priority} priority</span>
                         </div>

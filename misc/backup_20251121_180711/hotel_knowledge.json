@@ -1,0 +1,92 @@
+[
+  {
+    "id": "check-in-policy",
+    "category": "policies",
+    "title": "Check-in and Check-out Policy",
+    "content": "Check-in time is 3:00 PM (15:00) and check-out time is 11:00 AM. Early check-in is available upon request based on room availability and may incur an additional fee of $50. Late check-out until 2:00 PM can be arranged for $30. Guests arriving before check-in time can store luggage with the front desk free of charge. Express check-out is available through the TV in your room or mobile app."
+  },
+  {
+    "id": "wifi-internet",
+    "category": "amenities",
+    "title": "WiFi and Internet Access",
+    "content": "Complimentary high-speed WiFi is available throughout the hotel including guest rooms, lobby, restaurant, and pool area. Network name is 'GrandHotel-Guest' and the password is 'Welcome2024!'. Connection speed is 100 Mbps with unlimited data. Business center on the 2nd floor has desktop computers available 24/7. For WiFi technical support, contact the front desk at extension 0 or dial 206-555-0100."
+  },
+  {
+    "id": "breakfast-dining",
+    "category": "dining",
+    "title": "Breakfast and Dining Services",
+    "content": "Complimentary hot breakfast buffet is served daily from 6:30 AM to 10:30 AM in the Grand Dining Room on the 2nd floor. The breakfast includes continental options (fresh pastries, cereals, fruits, yogurt, juice, coffee) and hot items (scrambled eggs, bacon, sausage, pancakes, waffles, oatmeal). Vegetarian, vegan, and gluten-free options are available upon request. Our on-site restaurant 'The Cascade Bistro' serves lunch (11:30 AM - 2:30 PM) and dinner (5:00 PM - 10:00 PM) with Pacific Northwest cuisine. Bar service available until midnight."
+  },
+  {
+    "id": "parking-info",
+    "category": "amenities",
+    "title": "Parking and Vehicle Services",
+    "content": "Valet parking is available for $35 per night with in-and-out privileges. Self-parking in our secure covered garage is $25 per night. Electric vehicle charging stations are available on Level 2 of the garage (4 Tesla Superchargers and 6 universal Level 2 chargers) at $10 per session. Oversized vehicles (RVs, trucks with trailers) should notify the front desk in advance for special parking arrangements. Parking validation available for restaurant guests (2 hours free with $30 minimum purchase)."
+  },
+  {
+    "id": "fitness-pool",
+    "category": "amenities",
+    "title": "Fitness Center and Pool",
+    "content": "Our state-of-the-art fitness center is located on the 3rd floor and is open 24 hours a day, 7 days a week with keycard access. Equipment includes treadmills, ellipticals, stationary bikes, rowing machines, free weights, weight machines, yoga mats, and exercise balls. Personal training sessions can be arranged for $75/hour. The heated indoor saltwater pool is open from 6:00 AM to 10:00 PM daily. Pool depth ranges from 3.5 feet to 8 feet. Hot tub (jacuzzi) is located adjacent to the pool, seats 8 people. Pool towels provided at the fitness center desk. Children under 12 must be supervised by an adult."
+  },
+  {
+    "id": "room-service",
+    "category": "services",
+    "title": "Room Service and In-Room Dining",
+    "content": "Room service is available from 6:00 AM to 11:00 PM daily. To order, dial extension 2 from your room phone or use the mobile app. Full menu is available in the leather folder on your desk or digitally via QR code. Average delivery time is 30-45 minutes. Breakfast can be ordered the night before for specific delivery time. An 18% service charge and $5 delivery fee apply to all orders. Tray pickup - please place tray outside your door and call housekeeping at extension 3."
+  },
+  {
+    "id": "pet-policy",
+    "category": "policies",
+    "title": "Pet-Friendly Policy",
+    "content": "We warmly welcome pets! Dogs and cats under 50 pounds are permitted with a non-refundable pet fee of $75 per stay (not per night). Maximum of 2 pets per room. Upon arrival, guests with pets will receive a welcome kit including food/water bowls, pet bed, waste bags, and treats. Designated pet relief area is located on the north side of the building. Pets must be leashed in public areas and cannot be left unattended in rooms. Service animals and emotional support animals are always welcome at no charge - please inform us at booking. Nearby dog parks: Volunteer Park (0.5 miles), Cal Anderson Park (0.8 miles)."
+  },
+  {
+    "id": "business-services",
+    "category": "services",
+    "title": "Business Services and Meeting Rooms",
+    "content": "Business center is open 24/7 on the 2nd floor with desktop computers, printers, scanner, fax machine, and office supplies. Printing costs $0.25 per black-and-white page, $0.50 per color page. We have 4 meeting rooms accommodating 10-50 people each, equipped with projectors, whiteboards, video conferencing, and high-speed WiFi. Meeting room rental starts at $150 per half-day. Catering services available through our restaurant. Notary public services available at the front desk during business hours (9 AM - 5 PM weekdays)."
+  },
+  {
+    "id": "housekeeping",
+    "category": "services",
+    "title": "Housekeeping and Turndown Service",
+    "content": "Daily housekeeping service is provided between 9:00 AM and 3:00 PM. Please use the 'Do Not Disturb' sign if you prefer not to be disturbed. For eco-friendly guests, we offer a green program - decline daily housekeeping and receive a $10 food and beverage credit per day. Evening turndown service is available upon request (contact front desk before 6 PM). Extra towels, pillows, blankets, or toiletries can be requested by calling housekeeping at extension 3. Laundry and dry cleaning services available - place items in the laundry bag provided in your closet with completed form. Same-day service available for items received before 10 AM ($5 rush fee)."
+  },
+  {
+    "id": "local-transport",
+    "category": "transportation",
+    "title": "Local Transportation Services",
+    "content": "Complimentary hotel shuttle service runs to Seattle-Tacoma International Airport (SEA) every hour from 5:00 AM to 11:00 PM. Shuttle picks up outside the main entrance. Reservation required (call front desk at least 2 hours in advance). Local area shuttle service available within 3-mile radius weekdays 7 AM - 7 PM (free). Taxi service can be arranged at the front desk - average wait time 10-15 minutes. Uber and Lyft pickup zone is at the north entrance. Car rental desks for Enterprise and Hertz located in the lobby. Link Light Rail station is 2 blocks away (3-minute walk) - connects to downtown Seattle, University District, and airport. Bus stop directly in front of hotel serves routes 10, 49, and 60."
+  },
+  {
+    "id": "emergency-medical",
+    "category": "safety",
+    "title": "Emergency and Medical Information",
+    "content": "In case of emergency, dial 911 directly from your room phone (no need to dial 9 first). Front desk emergency line: dial 0 from room or 206-555-0199 from mobile. First aid kits available at front desk and fitness center. Automated External Defibrillator (AED) located in lobby and 3rd floor fitness center. Nearest hospital is Swedish Medical Center (0.8 miles, 5-minute drive). Urgent care clinic: Neighborcare Health at Meridian (0.4 miles, walking distance). 24-hour pharmacy: Bartell Drugs on Broadway (0.3 miles). Hotel has staff trained in CPR and first aid on duty 24/7. For non-emergency medical concerns, front desk can help arrange doctor appointments or telemedicine consultations."
+  },
+  {
+    "id": "accessibility",
+    "category": "accessibility",
+    "title": "Accessibility Features",
+    "content": "Our hotel is fully ADA compliant with accessible rooms on floors 2-5. Accessible rooms feature roll-in showers with grab bars, lowered sinks and mirrors, visual door alarms, and TTY devices. Elevator announcements in Braille and audio. Service animals welcome in all areas. Wheelchair accessible van transportation available (48-hour advance notice). Visual alert devices and door knockers available for hearing-impaired guests. Pool lift available at indoor pool. Accessible parking spaces available on Level 1 of parking garage near elevator. Front desk staff trained in accessibility assistance. Menus available in large print and Braille upon request."
+  },
+  {
+    "id": "local-attractions",
+    "category": "area-guide",
+    "title": "Nearby Attractions and Things to Do",
+    "content": "Pike Place Market - 1.2 miles (15-minute walk, 5-minute drive) - historic public market with fresh fish, produce, crafts, and restaurants. Space Needle - 1.5 miles - iconic observation tower with 360-degree city views. Seattle Art Museum - 1.1 miles - world-class art collection. Pioneer Square - 1.8 miles - historic district with galleries, nightlife, underground tour. Seattle Waterfront - 1.3 miles - ferry terminals, aquarium, restaurants. Capitol Hill neighborhood - 0.5 miles walking - vibrant area with restaurants, bars, music venues, shopping. Seattle Center - 1.6 miles - museums, theaters, Chihuly Garden and Glass. Kerry Park - 2.1 miles - best viewpoint for Seattle skyline photos. Front desk can provide detailed maps, recommendations, and help with tickets or reservations."
+  },
+  {
+    "id": "concierge-services",
+    "category": "services",
+    "title": "Concierge Services",
+    "content": "Our concierge desk is open daily from 7:00 AM to 10:00 PM (extension 5 or visit lobby). Services include: restaurant reservations at top Seattle restaurants, theater and concert ticket purchases, tour bookings (city tours, harbor cruises, winery tours, Mt. Rainier trips), car service arrangements, flower delivery, gift shopping assistance, event planning, and local recommendations. We can arrange special occasions like anniversary celebrations, proposals, or birthday surprises. Tickets can be charged to your room. Allow 24-48 hours for special requests. After hours, front desk can assist with urgent needs."
+  },
+  {
+    "id": "payment-billing",
+    "category": "policies",
+    "title": "Payment and Billing Information",
+    "content": "We accept Visa, MasterCard, American Express, Discover, JCB, and cash. Credit card authorization hold of $150 per night plus estimated charges placed at check-in for incidentals. Hold released 3-5 business days after checkout. Split payment between multiple cards available. Detailed itemized bills can be printed at checkout or emailed. Corporate direct billing available for approved companies. Receipts can be emailed or printed. Disputes must be reported within 30 days of checkout. We do not accept checks or money orders. Foreign currency exchange not available - nearest exchange at airport."
+  }
+]

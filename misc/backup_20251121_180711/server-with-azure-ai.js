@@ -1,25 +1,6 @@
-// Debug endpoint: Show all tickets saved (MongoDB or in-memory)
-app.get('/api/all-tickets', async (req, res) => {
-  try {
-    let allTickets = [];
-    if (TicketModel) {
-      allTickets = await TicketModel.find({}).lean();
-    } else if (USE_COSMOS_DB && ticketsContainer) {
-      const { resources } = await ticketsContainer.items.readAll().fetchAll();
-      allTickets = resources;
-    } else {
-      allTickets = inMemoryTickets;
-    }
-    res.json({ tickets: allTickets });
-  } catch (err) {
-    res.status(500).json({ error: err && err.message ? err.message : err });
-  }
-});
 // server-with-azure-ai.js
 // AI Concierge with Azure OpenAI Agentic Integration
-// [RUBRIC: Digital Transformation Solution]
-// This server implements the core logic for the AI Concierge, satisfying the requirement for an "Offered solution"
-// that automates guest interactions using State-of-the-Art LLMs.
+// Enhanced version with Azure AI agent capabilities for intelligent conversation and function calling
 
 require('dotenv').config();
 const express = require('express');
@@ -33,8 +14,6 @@ const USAGE_LOG_PATH = path.join(__dirname, 'usage.log.jsonl');
 const { AzureOpenAI } = require('openai');
 const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/identity');
 const { CosmosClient } = require('@azure/cosmos');
-const auth = require('./auth');
-const TextTranslationClient = require('@azure-rest/ai-translation-text').default;
 
 // Load data files relative to this script directory to avoid CWD issues
 let qna = [];
@@ -68,94 +47,9 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));  // Serve static files
 
-// Azure Translator Setup
-const translatorClient = TextTranslationClient(process.env.TRANSLATOR_ENDPOINT || 'https://api.cognitive.microsofttranslator.com/', {
-  key: process.env.TRANSLATOR_KEY,
-  region: process.env.TRANSLATOR_REGION || 'eastus2'
-});
-
-// Translation helper functions
-async function detectLanguage(text) {
-  try {
-    if (!text || text.trim().length === 0) return 'en';
-    
-    const response = await translatorClient.path('/detect').post({
-      body: [{ text: text }],
-      queryParameters: { 'api-version': '3.0' }
-    });
-    
-    const result = response.body;
-    if (result && result[0] && result[0].language) {
-      const detectedLang = result[0].language;
-      console.log(`🌐 Detected language: ${detectedLang}`);
-      return detectedLang;
-    }
-    return 'en';
-  } catch (error) {
-    console.error('Language detection error:', error.message);
-    return 'en'; // Default to English on error
-  }
-}
-
-async function translateText(text, targetLanguage) {
-  try {
-    if (!text || targetLanguage === 'en') return text;
-    
-    const response = await translatorClient.path('/translate').post({
-      body: [{ text: text }],
-      queryParameters: {
-        'api-version': '3.0',
-        'to': [targetLanguage]
-      }
-    });
-    
-    const result = response.body;
-    if (result && result[0] && result[0].translations && result[0].translations[0]) {
-      const translated = result[0].translations[0].text;
-      console.log(`🌐 Translated to ${targetLanguage}: ${text.substring(0, 50)}... → ${translated.substring(0, 50)}...`);
-      return translated;
-    }
-    return text;
-  } catch (error) {
-    console.error('Translation error:', error.message);
-    return text; // Return original text on error
-  }
-}
-
-// Mongoose (MongoDB / Cosmos DB - Mongo API) connection (optional)
-const mongoose = require('mongoose');
-const MONGO_URI = process.env.MONGO_URI;
-if (!MONGO_URI) {
-  console.warn('MONGO_URI not set. If you want Mongo (Cosmos Mongo API) persistence, set MONGO_URI in .env');
-} else {
-  mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log('✓ Connected to MongoDB (via MONGO_URI)'))
-    .catch(err => console.error('✗ MongoDB connection error (MONGO_URI):', err && err.message ? err.message : err));
-}
-
-// Optional: Mongoose Ticket model (used to persist tickets created by the agent)
-let TicketModel = null;
-try {
-  TicketModel = require('./models/Ticket');
-} catch (e) {
-  TicketModel = null;
-}
-
 const PORT = process.env.PORT || 3000;
 
-// --- Authentication middleware ---
-function requireAuth(req, res, next) {
-  const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.body.sessionToken;
-  const session = auth.verifySession(sessionToken);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized - Invalid or expired session' });
-  }
-
-  req.session = session;
-  req.sessionToken = sessionToken;
-  next();
-}
+// ============================================
 // COSMOS DB SETUP FOR TICKETING
 // ============================================
 
@@ -182,46 +76,22 @@ if (USE_COSMOS_DB) {
 const inMemoryTickets = [];
 
 // ============================================
-// ANALYTICS TRACKING SYSTEM - ACTIONABLE BUSINESS INSIGHTS
+// ANALYTICS TRACKING SYSTEM
 // ============================================
 
 const analytics = {
-  // [RUBRIC: Key Performance Indicators (KPIs)]
-  // Business-focused metrics for decision making:
-  
-  // GUEST-FACING INSIGHTS
-  guestSatisfaction: [],  // { sessionId, rating, feedback, timestamp, category }
-  serviceRequests: [],    // { ticketId, type, priority, responseTime, resolutionTime, status }
-  peakDemandTimes: {},    // hour -> requestCount (identifies staffing needs)
-  
-  // HOTEL OPERATIONS INSIGHTS
-  ragPerformance: [],     // { query, confidence, sourcesUsed, wasAccurate, timestamp }
-  commonIssues: {},       // issueCategory -> { count, avgResolutionTime, staffAssigned }
-  upsellOpportunities: [],// { sessionId, recommendation, category, wasConverted, timestamp }
-  
-  // REVENUE & EFFICIENCY
-  deflectionRate: { successfulSelfService: 0, requiredStaff: 0 }, // Cost savings metric
-  staffEfficiency: {},    // staffId -> { ticketsHandled, avgResponseTime, satisfaction }
-  guestPreferences: {},   // dietary/interests patterns for personalization
-  
-  // OPERATIONAL QUALITY
-  responseTimeTracking: [],  // { timestamp, responseTimeMs, wasRag, satisfactory }
-  knowledgeGaps: [],      // { query, noAnswer, timestamp } - what to add to knowledge base
-  responseRatings: [],    // { sessionId, messageId, rating, timestamp } - thumbs up/down ratings
-  
-  // Legacy (kept for backward compatibility, but not displayed)
-  sessions: {},           
-  questions: {},          
-  failedQueries: [],
-  tickets: [],
-  conversions: [],
-  locationSearches: {}
+  sessions: {},           // sessionId -> { messageCount, firstSeen, lastSeen }
+  questions: {},          // question -> count
+  failedQueries: [],      // { query, reason, timestamp, sessionId }
+  tickets: [],            // { ticketId, requestType, timestamp, sessionId }
+  conversions: [],        // { type, value, timestamp, sessionId }
+  locationSearches: {}    // location -> count
 };
 
 function trackQuestion(sessionId, question) {
   const normalized = question.toLowerCase().trim();
   analytics.questions[normalized] = (analytics.questions[normalized] || 0) + 1;
-
+  
   if (!analytics.sessions[sessionId]) {
     analytics.sessions[sessionId] = {
       messageCount: 0,
@@ -240,7 +110,7 @@ function trackFailedQuery(sessionId, query, reason) {
     reason,
     timestamp: new Date().toISOString()
   });
-
+  
   // Keep only last 100 failed queries
   if (analytics.failedQueries.length > 100) {
     analytics.failedQueries.shift();
@@ -254,7 +124,7 @@ function trackTicket(sessionId, ticketId, requestType) {
     requestType,
     timestamp: new Date().toISOString()
   });
-
+  
   // Track as conversion
   trackConversion(sessionId, 'ticket_created', requestType);
 }
@@ -270,155 +140,6 @@ function trackConversion(sessionId, type, value = null) {
 
 function trackLocationSearch(location) {
   analytics.locationSearches[location] = (analytics.locationSearches[location] || 0) + 1;
-}
-
-// NEW: Track guest satisfaction (from feedback)
-function trackGuestSatisfaction(sessionId, rating, feedback = '', category = 'general') {
-  analytics.guestSatisfaction.push({
-    sessionId,
-    rating, // 1-5 scale
-    feedback,
-    category,
-    timestamp: new Date().toISOString()
-  });
-}
-
-// NEW: Track service request lifecycle
-function trackServiceRequest(ticketId, type, priority, status = 'open', responseTime = null, resolutionTime = null, guestName = null, roomNumber = null, description = null) {
-  const existing = analytics.serviceRequests.find(r => r.ticketId === ticketId);
-  if (existing) {
-    existing.status = status;
-    existing.responseTime = responseTime;
-    existing.resolutionTime = resolutionTime;
-  } else {
-    analytics.serviceRequests.push({
-      ticketId,
-      type,
-      priority,
-      status,
-      responseTime,
-      resolutionTime,
-      guestName,
-      roomNumber,
-      description,
-      createdAt: new Date().toISOString()
-    });
-  }
-}
-
-// NEW: Track peak demand for staffing optimization
-function trackPeakDemand() {
-  const hour = new Date().getHours();
-  analytics.peakDemandTimes[hour] = (analytics.peakDemandTimes[hour] || 0) + 1;
-}
-
-// NEW: Track RAG performance for quality monitoring
-function trackRAGPerformance(query, confidence, sourcesUsed, wasAccurate = true) {
-  analytics.ragPerformance.push({
-    query,
-    confidence,
-    sourcesUsed,
-    wasAccurate,
-    timestamp: new Date().toISOString()
-  });
-  
-  // Keep only last 500 entries
-  if (analytics.ragPerformance.length > 500) {
-    analytics.ragPerformance.shift();
-  }
-}
-
-// NEW: Track common issues for process improvement
-function trackCommonIssue(category, resolutionTime = null, staffAssigned = null) {
-  if (!analytics.commonIssues[category]) {
-    analytics.commonIssues[category] = {
-      count: 0,
-      totalResolutionTime: 0,
-      staffAssignments: {}
-    };
-  }
-  
-  analytics.commonIssues[category].count++;
-  if (resolutionTime) {
-    analytics.commonIssues[category].totalResolutionTime += resolutionTime;
-  }
-  if (staffAssigned) {
-    analytics.commonIssues[category].staffAssignments[staffAssigned] = 
-      (analytics.commonIssues[category].staffAssignments[staffAssigned] || 0) + 1;
-  }
-}
-
-// NEW: Track upsell opportunities
-function trackUpsell(sessionId, recommendation, category, wasConverted = false) {
-  analytics.upsellOpportunities.push({
-    sessionId,
-    recommendation,
-    category,
-    wasConverted,
-    timestamp: new Date().toISOString()
-  });
-}
-
-// NEW: Track deflection rate (AI resolved vs staff needed)
-function trackDeflection(wasDeflected) {
-  if (wasDeflected) {
-    analytics.deflectionRate.successfulSelfService++;
-  } else {
-    analytics.deflectionRate.requiredStaff++;
-  }
-}
-
-// NEW: Track response time
-function trackResponseTime(responseTimeMs, wasRag, satisfactory = true) {
-  analytics.responseTimeTracking.push({
-    timestamp: new Date().toISOString(),
-    responseTimeMs,
-    wasRag,
-    satisfactory
-  });
-  
-  // Keep only last 1000 entries
-  if (analytics.responseTimeTracking.length > 1000) {
-    analytics.responseTimeTracking.shift();
-  }
-}
-
-// NEW: Track knowledge gaps
-function trackKnowledgeGap(query) {
-  analytics.knowledgeGaps.push({
-    query,
-    timestamp: new Date().toISOString()
-  });
-  
-  // Keep only last 100 entries
-  if (analytics.knowledgeGaps.length > 100) {
-    analytics.knowledgeGaps.shift();
-  }
-}
-
-// NEW: Track guest preferences for personalization
-function trackGuestPreference(category, value) {
-  if (!analytics.guestPreferences[category]) {
-    analytics.guestPreferences[category] = {};
-  }
-  analytics.guestPreferences[category][value] = 
-    (analytics.guestPreferences[category][value] || 0) + 1;
-}
-
-function trackResponseRating(sessionId, messageId, rating) {
-  analytics.responseRatings.push({
-    sessionId,
-    messageId,
-    rating, // 'positive' or 'negative'
-    timestamp: new Date().toISOString()
-  });
-  
-  // Keep only last 1000 ratings
-  if (analytics.responseRatings.length > 1000) {
-    analytics.responseRatings.shift();
-  }
-  
-  console.log(`📊 Response rated: ${rating} (Message: ${messageId}, Session: ${sessionId})`);
 }
 
 // ============================================
@@ -450,7 +171,7 @@ const inMemoryProfiles = new Map();
 // Profile helper functions
 async function getGuestProfile(sessionId) {
   if (!sessionId) return null;
-
+  
   try {
     if (USE_PROFILES_DB && profilesContainer) {
       const { resource } = await profilesContainer.item(sessionId, sessionId).read();
@@ -498,33 +219,26 @@ function createNewProfile(sessionId) {
 // RAG SYSTEM - SEMANTIC SEARCH WITH EMBEDDINGS
 // ============================================
 
-// ============================================
-// RAG SYSTEM - SEMANTIC SEARCH WITH EMBEDDINGS
-// [RUBRIC: Methods & Algorithms]
-// Implements Retrieval-Augmented Generation (RAG) to ground AI responses in factual hotel data.
-// Uses Cosine Similarity on Vector Embeddings to find the most relevant policy documents.
-// ============================================
-
 let knowledgeBaseEmbeddings = []; // Store documents with their embeddings
 let ragInitialized = false;
 
 // Cosine similarity function
 function cosineSimilarity(vecA, vecB) {
   if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
-
+  
   let dotProduct = 0;
   let magA = 0;
   let magB = 0;
-
+  
   for (let i = 0; i < vecA.length; i++) {
     dotProduct += vecA[i] * vecB[i];
     magA += vecA[i] * vecA[i];
     magB += vecB[i] * vecB[i];
   }
-
+  
   magA = Math.sqrt(magA);
   magB = Math.sqrt(magB);
-
+  
   if (magA === 0 || magB === 0) return 0;
   return dotProduct / (magA * magB);
 }
@@ -532,7 +246,7 @@ function cosineSimilarity(vecA, vecB) {
 // Generate embedding for text using Azure OpenAI
 async function generateEmbedding(text) {
   if (!azureOpenAIClient) return null;
-
+  
   try {
     // Create a new client specifically for embeddings with correct deployment
     const embeddingClient = new AzureOpenAI({
@@ -541,12 +255,12 @@ async function generateEmbedding(text) {
       apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview',
       deployment: 'text-embedding-ada-002' // Use embedding deployment name
     });
-
+    
     const response = await embeddingClient.embeddings.create({
       model: 'text-embedding-ada-002',
       input: text.substring(0, 8000) // Limit to 8000 chars
     });
-
+    
     return response.data[0].embedding;
   } catch (error) {
     console.error('Embedding generation error:', error.message);
@@ -560,64 +274,68 @@ async function initializeRAG() {
     console.log('⚠️  RAG not initialized - Azure OpenAI or knowledge base missing');
     return;
   }
-
+  
   console.log('🔄 Initializing RAG system - generating embeddings...');
-
+  
   try {
     const startTime = Date.now();
-
+    
     // Generate embeddings for all knowledge documents
     for (const doc of hotelKnowledge) {
       const text = `${doc.title}. ${doc.content}`;
       const embedding = await generateEmbedding(text);
-
+      
       if (embedding) {
         knowledgeBaseEmbeddings.push({
           ...doc,
           embedding: embedding
         });
       }
-
+      
       // Small delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-
+    
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     ragInitialized = true;
     console.log(`✅ RAG initialized with ${knowledgeBaseEmbeddings.length} documents in ${duration}s`);
-    console.log(`🎯 RAG System Status: ✓ Ready\n`);
   } catch (error) {
     console.error('❌ RAG initialization failed:', error.message);
   }
 }
 
-// Semantic search function - finds relevant documents using cosine similarity
+// Semantic search using RAG
 async function semanticSearch(query, topK = 3) {
   if (!ragInitialized || knowledgeBaseEmbeddings.length === 0) {
-    console.log('⚠️  RAG not initialized, cannot perform semantic search');
+    console.log('RAG not available, using fallback');
     return [];
   }
-
+  
   try {
-    // Generate embedding for the query
+    // Generate embedding for user query
     const queryEmbedding = await generateEmbedding(query);
     if (!queryEmbedding) return [];
-
-    // Calculate similarity scores for all documents
-    const scoredDocs = knowledgeBaseEmbeddings.map(doc => ({
-      ...doc,
-      similarity: cosineSimilarity(queryEmbedding, doc.embedding)
-    }));
-
-    // Sort by similarity and return top K relevant documents (with threshold)
-    const relevantDocs = scoredDocs
-      .filter(doc => doc.similarity > 0.7) // Only return if similarity > 70%
+    
+    // Calculate similarity with all documents
+    const results = knowledgeBaseEmbeddings.map(doc => {
+      const similarity = cosineSimilarity(queryEmbedding, doc.embedding);
+      return {
+        id: doc.id,
+        title: doc.title,
+        content: doc.content,
+        category: doc.category,
+        similarity: similarity
+      };
+    });
+    
+    // Sort by similarity and return top results
+    const topResults = results
+      .filter(r => r.similarity > 0.7) // Only return relevant results
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, topK);
-
-    console.log(`🔍 Semantic search found ${relevantDocs.length} relevant documents (threshold: 0.7)`);
-
-    return relevantDocs;
+    
+    console.log(`🔍 Semantic search found ${topResults.length} relevant documents`);
+    return topResults;
   } catch (error) {
     console.error('Semantic search error:', error.message);
     return [];
@@ -627,36 +345,26 @@ async function semanticSearch(query, topK = 3) {
 // Answer question using RAG
 async function answerWithRAG(query) {
   const relevantDocs = await semanticSearch(query, 3);
-
+  
   if (relevantDocs.length === 0) {
-    return null; // No relevant documents found
+    // Fall back to old qna.json search
+    return answerFromQnA(query);
   }
-
-  // Build context from relevant documents
-  const context = relevantDocs.map((doc, idx) =>
-    `Document ${idx + 1} (${doc.category}): ${doc.content}`
-  ).join('\n\n');
-
-  // Return answer with source documents
+  
+  // Build context from retrieved documents
+  const context = relevantDocs
+    .map(doc => `${doc.title}:\n${doc.content}`)
+    .join('\n\n');
+  
   return {
     answer: context,
-    sources: relevantDocs.map(doc => ({
-      title: doc.title,
-      category: doc.category,
-      similarity: doc.similarity.toFixed(3)
-    }))
+    sources: relevantDocs.map(d => ({ id: d.id, title: d.title, similarity: d.similarity.toFixed(3) })),
+    useRAG: true
   };
 }
 
 // ============================================
 // AZURE OPENAI AGENT SETUP
-// ============================================
-
-// ============================================
-// AZURE OPENAI AGENT SETUP
-// [RUBRIC: Technologies & Justification]
-// Selected Azure OpenAI for enterprise-grade security, compliance (GDPR/HIPAA), and reliability.
-// Uses GPT-4 for complex reasoning and "function calling" capabilities.
 // ============================================
 
 let azureOpenAIClient = null;
@@ -683,7 +391,7 @@ if (USE_AZURE_AI) {
       const credential = new DefaultAzureCredential();
       const scope = 'https://cognitiveservices.azure.com/.default';
       const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
+      
       azureOpenAIClient = new AzureOpenAI({
         endpoint,
         azureADTokenProvider,
@@ -930,7 +638,7 @@ function answerFromQnA(text) {
   const fuseResults = fuse.search(userNorm);
   if (process.env.QNA_DEBUG) {
     console.log('[QNA DEBUG] user text:', text);
-    console.log('[QNA DEBUG] fuse results (top 5):', (fuseResults || []).slice(0, 5).map(r => ({ q: r.item.question, score: r.score })));
+    console.log('[QNA DEBUG] fuse results (top 5):', (fuseResults || []).slice(0,5).map(r => ({ q: r.item.question, score: r.score })));
   }
 
   if (!fuseResults || fuseResults.length === 0) return null;
@@ -958,7 +666,7 @@ function logTokenUsage(usage, stage) {
       model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'unknown',
       prompt_tokens: usage.prompt_tokens ?? usage.promptTokens ?? 0,
       completion_tokens: usage.completion_tokens ?? usage.completionTokens ?? 0,
-      total_tokens: usage.total_tokens ?? usage.totalTokens ?? ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0))
+      total_tokens: usage.total_tokens ?? usage.totalTokens ?? ((usage.prompt_tokens||0) + (usage.completion_tokens||0))
     };
     fs.appendFileSync(USAGE_LOG_PATH, JSON.stringify(rec) + '\n', 'utf8');
   } catch (e) {
@@ -1090,7 +798,7 @@ async function geocodeCity(cityName) {
       headers: { 'User-Agent': 'HotelConciergeBot/1.0' },
       signal: AbortSignal.timeout(5000)
     });
-
+    
     if (response.ok) {
       const data = await response.json();
       if (data && data.length > 0) {
@@ -1113,7 +821,7 @@ async function geocodeCity(cityName) {
 // ============================================
 async function fetchWeatherData(location) {
   const WEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
-
+  
   if (!WEATHER_API_KEY || WEATHER_API_KEY === 'demo') {
     // Return mock data if no API key configured
     return {
@@ -1156,13 +864,13 @@ async function fetchWeatherData(location) {
     // Fetch current weather
     const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=imperial`;
     const response = await fetchWithRetry(weatherUrl, { timeoutMs: 5000 });
-
+    
     if (!response.ok) {
       throw new Error(`Weather API returned ${response.status}`);
     }
 
     const data = await response.json();
-
+    
     return {
       success: true,
       location: data.name || cityName,
@@ -1208,9 +916,9 @@ function generateWeatherAdvice(weatherData) {
 async function searchEvents(location, eventType = 'all', timeframe = 'this_week') {
   // Using Ticketmaster Discovery API for real event data
   // Docs: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
-
+  
   const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY;
-
+  
   if (!TICKETMASTER_API_KEY || TICKETMASTER_API_KEY === 'demo') {
     // Return curated mock events when no API key configured
     return {
@@ -1266,7 +974,7 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
     // Build Ticketmaster API URL - radius in miles
     const radiusMiles = 15;
     let apiUrl = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_API_KEY}&latlong=${coords.lat},${coords.lon}&radius=${radiusMiles}&unit=miles&size=20&sort=date,asc`;
-
+    
     // Add event type classification
     if (eventType && eventType !== 'all') {
       const classificationMap = {
@@ -1286,8 +994,8 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
     // Add date range
     const now = new Date();
     let startDateTime, endDateTime;
-
-    switch (timeframe) {
+    
+    switch(timeframe) {
       case 'tonight':
         startDateTime = new Date(now);
         startDateTime.setHours(18, 0, 0, 0);
@@ -1315,7 +1023,7 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
         startDateTime = new Date(now);
         startDateTime.setHours(0, 0, 0, 0);
         endDateTime = new Date(now);
-        endDateTime.setHours(23, 59, 59, 999);
+        endDateTime.setHours(23, 59, 59, 999);s
         break;
       default: // this_week
         startDateTime = new Date(now);
@@ -1330,9 +1038,9 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
     }
 
     console.log('Calling Ticketmaster API');
-
+    
     const response = await fetchWithRetry(apiUrl, { timeoutMs: 5000 });
-
+    
     if (!response.ok) {
       const errorBody = await response.text();
       console.error('Ticketmaster error response:', response.status, errorBody);
@@ -1341,22 +1049,22 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
 
     const data = await response.json();
     const eventsList = data._embedded?.events || [];
-
+    
     console.log('Ticketmaster returned', eventsList.length, 'events');
-
+    
     const events = eventsList.slice(0, 10).map(event => {
       const venue = event._embedded?.venues?.[0];
       const priceRange = event.priceRanges?.[0];
-
+      
       return {
         title: event.name,
         type: event.classifications?.[0]?.segment?.name || 'Event',
-        date: new Date(event.dates.start.localDate + 'T' + (event.dates.start.localTime || '00:00:00')).toLocaleString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit'
+        date: new Date(event.dates.start.localDate + 'T' + (event.dates.start.localTime || '00:00:00')).toLocaleString('en-US', { 
+          weekday: 'short', 
+          month: 'short', 
+          day: 'numeric', 
+          hour: 'numeric', 
+          minute: '2-digit' 
         }),
         venue: venue?.name || 'TBA',
         price: priceRange ? `$${priceRange.min}-${priceRange.max}` : 'See website',
@@ -1385,7 +1093,7 @@ async function findPlaces(cityOrCoords, type = 'tourist attraction') {
 
   // Use Azure Maps Search API (free tier) - more reliable than Nominatim
   const AZURE_MAPS_KEY = process.env.AZURE_MAPS_KEY || 'demo'; // User can add their key later
-
+  
   if (typeof cityOrCoords === 'object' && cityOrCoords.lat && cityOrCoords.lon) {
     try {
       const coordsPlaces = await findPlacesAroundCoords(cityOrCoords.lat, cityOrCoords.lon, 1200, type);
@@ -1400,16 +1108,16 @@ async function findPlaces(cityOrCoords, type = 'tourist attraction') {
   }
 
   const cityName = typeof cityOrCoords === 'string' ? cityOrCoords : String(cityOrCoords || '');
-
+  
   // Check if we have coordinates for this city (cached or known)
   const cityKey = cityName.toLowerCase();
   let knownCity = CITY_COORDS[cityKey];
-
+  
   // If not in cache, try to geocode it dynamically
   if (!knownCity) {
     knownCity = await geocodeCity(cityName);
   }
-
+  
   if (knownCity) {
     console.log(`Using coordinates for ${cityName}: ${knownCity.lat}, ${knownCity.lon}`);
     try {
@@ -1422,7 +1130,7 @@ async function findPlaces(cityOrCoords, type = 'tourist attraction') {
       console.error('Error searching by coordinates:', err.message || err);
     }
   }
-
+  
   // If geocoding failed or no results, use fallback
   console.log(`No results found for ${cityName}, using fallback places.`);
   return { live: false, places: FALLBACK_PLACES };
@@ -1438,18 +1146,18 @@ function filterPlacesByType(places, type) {
     const isFood = /(food|restaurant|restaurants|cafe|cafes|eat|eatery)/.test(t);
     const isShop = /(shopping|shop|shops|mall|market)/.test(t);
     const isAttraction = /(attraction|museum|museums|park|parks|theatre|theater|cinema)/.test(t) || (!isFood && !isShop);
-    const FOOD = new Set(['restaurant', 'cafe', 'fast_food', 'food_court', 'ice_cream', 'bar', 'pub']);
-    const SHOP = new Set(['mall', 'department_store', 'supermarket', 'convenience', 'clothes', 'electronics', 'bakery', 'butcher', 'books', 'furniture', 'shoe', 'jewelry', 'gift', 'toy', 'cosmetics', 'marketplace']);
-    const ATR = new Set(['museum', 'attraction', 'gallery', 'artwork', 'zoo', 'theatre', 'cinema', 'park', 'garden']);
+    const FOOD = new Set(['restaurant','cafe','fast_food','food_court','ice_cream','bar','pub']);
+    const SHOP = new Set(['mall','department_store','supermarket','convenience','clothes','electronics','bakery','butcher','books','furniture','shoe','jewelry','gift','toy','cosmetics','marketplace']);
+    const ATR = new Set(['museum','attraction','gallery','artwork','zoo','theatre','cinema','park','garden']);
     const ok = (val) => {
-      const v = String(val || '').toLowerCase();
+      const v = String(val||'').toLowerCase();
       if (isFood) return FOOD.has(v);
-      if (isShop) return SHOP.has(v) || v === 'shop';
+      if (isShop) return SHOP.has(v) || v==='shop';
       if (isAttraction) return ATR.has(v);
       return true;
     };
     const out = places.filter(p => ok(p.type));
-    return out.length > 0 ? out : places;
+    return out.length>0 ? out : places;
   } catch { return places || []; }
 }
 // TOOL EXECUTION HANDLERS
@@ -1458,19 +1166,19 @@ function filterPlacesByType(places, type) {
 async function executeToolCall(toolCall) {
   const functionName = toolCall.function.name;
   const args = JSON.parse(toolCall.function.arguments || '{}');
-
+  
   console.log(`?? Executing tool: ${functionName}`, args);
 
   switch (functionName) {
     case 'searchNearbyAttractions': {
       let location = args.location;
       const type = args.type || 'tourist attraction';
-
+      
       // Use browser coordinates if available and location is BROWSER_COORDS
       if (location === 'BROWSER_COORDS' && global.browserCoords) {
         location = { lat: parseFloat(global.browserCoords.lat), lon: parseFloat(global.browserCoords.lon) };
       }
-
+      
       // Track location search (use friendly name for coordinates)
       let locationStr;
       if (typeof location === 'object') {
@@ -1482,21 +1190,21 @@ async function executeToolCall(toolCall) {
         locationStr = location;
       }
       trackLocationSearch(locationStr);
-
+      
       const result = await findPlaces(location, type);
       const filteredPlaces = filterPlacesByType(result.places, type);
-
+      
       // Track failed query if no results
       if (filteredPlaces.length === 0) {
         const sessionId = global.currentSessionId || 'unknown';
         trackFailedQuery(sessionId, `${type} near ${locationStr}`, 'no_results');
       }
-
+      
       return {
         success: true,
         live: result.live,
         places: filteredPlaces,
-        message: result.live
+        message: result.live 
           ? `Found ${filteredPlaces.length} ${type}(s) near ${typeof location === 'object' ? 'your location' : location}`
           : `Using fallback suggestions (live data unavailable)`
       };
@@ -1504,12 +1212,12 @@ async function executeToolCall(toolCall) {
 
     case 'searchFoodPlaces': {
       let location = args.location;
-
+      
       // Use browser coordinates if available and location is BROWSER_COORDS
       if (location === 'BROWSER_COORDS' && global.browserCoords) {
         location = { lat: parseFloat(global.browserCoords.lat), lon: parseFloat(global.browserCoords.lon) };
       }
-
+      
       const result = await findPlaces(location, 'restaurant');
       const filteredPlaces = filterPlacesByType(result.places, 'restaurant');
       return {
@@ -1524,12 +1232,12 @@ async function executeToolCall(toolCall) {
 
     case 'searchAttractionPlaces': {
       let location = args.location;
-
+      
       // Use browser coordinates if available and location is BROWSER_COORDS
       if (location === 'BROWSER_COORDS' && global.browserCoords) {
         location = { lat: parseFloat(global.browserCoords.lat), lon: parseFloat(global.browserCoords.lon) };
       }
-
+      
       const result = await findPlaces(location, 'tourist attraction');
       const filteredPlaces = filterPlacesByType(result.places, 'tourist attraction');
       return {
@@ -1544,12 +1252,12 @@ async function executeToolCall(toolCall) {
 
     case 'searchShoppingPlaces': {
       let location = args.location;
-
+      
       // Use browser coordinates if available and location is BROWSER_COORDS
       if (location === 'BROWSER_COORDS' && global.browserCoords) {
         location = { lat: parseFloat(global.browserCoords.lat), lon: parseFloat(global.browserCoords.lon) };
       }
-
+      
       const result = await findPlaces(location, 'shopping');
       const filteredPlaces = filterPlacesByType(result.places, 'shopping');
       return {
@@ -1563,46 +1271,26 @@ async function executeToolCall(toolCall) {
     }
 
     case 'getHotelInfo': {
-      // Try RAG first (semantic search), fallback to keyword QnA
-      if (ragInitialized) {
-        const ragResult = await answerWithRAG(args.query);
-        if (ragResult) {
-          console.log(`✅ Answered using RAG with ${ragResult.sources.length} sources`);
-          
-          // NEW: Track RAG performance
-          const avgConfidence = ragResult.sources.reduce((sum, s) => sum + parseFloat(s.similarity), 0) / ragResult.sources.length;
-          trackRAGPerformance(args.query, avgConfidence, ragResult.sources.length, true);
-          trackDeflection(true); // RAG answered = deflected from staff
-          trackResponseTime(Date.now() - (global.requestStartTime || Date.now()), true, true);
-          
-          return {
-            success: true,
-            answer: ragResult.answer,
-            sources: ragResult.sources,
-            method: 'RAG',
-            query: args.query
-          };
-        } else {
-          // RAG couldn't find answer - track knowledge gap
-          trackKnowledgeGap(args.query);
-        }
+      // Try RAG semantic search first
+      const ragResult = await answerWithRAG(args.query);
+      
+      if (ragResult && ragResult.useRAG && ragResult.sources.length > 0) {
+        return {
+          success: true,
+          answer: ragResult.answer,
+          sources: ragResult.sources,
+          query: args.query,
+          method: 'RAG'
+        };
       }
-
-      // Fallback to keyword-based QnA
+      
+      // Fall back to old Q&A search
       const answer = answerFromQnA(args.query);
-      
-      if (answer) {
-        trackDeflection(true); // QnA answered = deflected
-        trackResponseTime(Date.now() - (global.requestStartTime || Date.now()), false, true);
-      } else {
-        trackKnowledgeGap(args.query);
-      }
-      
       return {
         success: true,
         answer: answer || 'I don\'t have that specific information. Please contact hotel staff.',
-        method: 'QnA',
-        query: args.query
+        query: args.query,
+        method: 'QnA'
       };
     }
 
@@ -1617,12 +1305,10 @@ async function executeToolCall(toolCall) {
 
     case 'createTicket': {
       const ticketId = `TKT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      // Use session info if available (guest is logged in)
-      const sessionInfo = global.sessionInfo || {};
       const ticket = {
         id: ticketId,
-        guestName: args.guestName || sessionInfo.guestName || 'Guest',
-        roomNumber: args.roomNumber || sessionInfo.roomNumber || 'Not specified',
+        guestName: args.guestName || 'Guest',
+        roomNumber: args.roomNumber || 'Not specified',
         requestType: args.requestType,
         priority: args.priority || 'Medium',
         description: args.description,
@@ -1643,25 +1329,6 @@ async function executeToolCall(toolCall) {
           console.log(`? Ticket ${ticketId} saved to in-memory storage`);
         }
 
-        // Also try to persist via Mongoose Ticket model (if available).
-        // This ensures tickets created via the agent also appear in the Mongo/Cosmos (Mongo API) collection
-        try {
-          if (TicketModel) {
-            const mongoDoc = await TicketModel.create({
-              guestName: ticket.guestName,
-              roomNumber: ticket.roomNumber,
-              requestType: ticket.requestType,
-              priority: ticket.priority,
-              description: ticket.description,
-              status: ticket.status,
-              meta: { createdBy: 'agent', externalId: ticketId }
-            });
-            console.log(`? Ticket ${ticketId} also saved to MongoDB (Mongoose) _id=${mongoDoc._id}`);
-          }
-        } catch (mErr) {
-          console.error('Mongoose save (agent) failed:', mErr && mErr.message ? mErr.message : mErr);
-        }
-
         // Estimate response time based on request type
         const estimatedTime = {
           'Housekeeping': '15-20 minutes',
@@ -1674,22 +1341,6 @@ async function executeToolCall(toolCall) {
         // Track ticket creation in analytics
         const sessionId = global.currentSessionId || 'unknown';
         trackTicket(sessionId, ticketId, args.requestType);
-        
-        // NEW: Track service request for operations dashboard (with full ticket details)
-        trackServiceRequest(
-          ticketId, 
-          args.requestType, 
-          args.priority || 'Medium', 
-          'open',
-          null,  // responseTime
-          null,  // resolutionTime
-          ticket.guestName,
-          ticket.roomNumber,
-          ticket.description
-        );
-        trackCommonIssue(args.requestType);
-        trackPeakDemand();
-        trackDeflection(false); // Ticket created = not deflected
 
         return {
           success: true,
@@ -1738,17 +1389,6 @@ async function executeToolCall(toolCall) {
         profile.lastActive = new Date().toISOString();
 
         await saveGuestProfile(profile);
-        
-        // NEW: Track guest preferences for personalization insights
-        if (args.interests) {
-          args.interests.forEach(interest => trackGuestPreference('interests', interest));
-        }
-        if (args.dietary) {
-          args.dietary.forEach(diet => trackGuestPreference('dietary', diet));
-        }
-        if (args.mobility) {
-          trackGuestPreference('mobility', args.mobility);
-        }
 
         return {
           success: true,
@@ -1771,7 +1411,7 @@ async function executeToolCall(toolCall) {
       try {
         const location = args.location || 'current';
         const weatherData = await fetchWeatherData(location);
-
+        
         if (!weatherData.success) {
           return {
             success: false,
@@ -1801,9 +1441,9 @@ async function executeToolCall(toolCall) {
         const location = args.location;
         const eventType = args.eventType || 'all';
         const timeframe = args.timeframe || 'today';
-
+        
         const eventsData = await searchEvents(location, eventType, timeframe);
-
+        
         if (!eventsData.success) {
           return {
             success: false,
@@ -1839,14 +1479,13 @@ async function executeToolCall(toolCall) {
 // AZURE AI AGENT CONVERSATION HANDLER
 // ============================================
 
-async function handleAzureAIAgent(userMessage, conversationHistory = [], guestProfile = null, browserCoords = null, sessionInfo = null) {
+async function handleAzureAIAgent(userMessage, conversationHistory = [], guestProfile = null, browserCoords = null) {
   if (!azureOpenAIClient) {
     throw new Error('Azure OpenAI client not initialized');
   }
 
-  // Store browser coordinates and session info globally for tool access
+  // Store browser coordinates globally for tool access
   global.browserCoords = browserCoords;
-  global.sessionInfo = sessionInfo;
 
   // Check if this is a new guest (no profile) for onboarding
   const isNewGuest = !guestProfile || !guestProfile.onboardingComplete;
@@ -1855,17 +1494,6 @@ async function handleAzureAIAgent(userMessage, conversationHistory = [], guestPr
     - Latitude: ${browserCoords.lat}
     - Longitude: ${browserCoords.lon}
     - When user says "near me", "nearby", "around here", use BROWSER_COORDS as the location parameter instead of a city name.`
-    : '';
-
-  const sessionContext = sessionInfo
-    ? `\n\nLOGGED-IN GUEST INFORMATION (automatically available - DO NOT ask for this):
-    - Guest Name: ${sessionInfo.guestName}
-    - Room Number: ${sessionInfo.roomNumber}
-    
-    ⚠️ CRITICAL: When creating tickets with createTicket tool, ALWAYS use these values:
-    - guestName: "${sessionInfo.guestName}"
-    - roomNumber: "${sessionInfo.roomNumber}"
-    NEVER ask the guest for their name or room number - you already have it!`
     : '';
 
   const profileContext = guestProfile && guestProfile.onboardingComplete
@@ -1931,7 +1559,7 @@ Communication style:
 - Use phrases like "I'd be delighted to help", "Wonderful!", "Let me find that for you"
 - End interactions with encouraging notes like "Enjoy your visit!", "Have a great time!", or "Please let me know if you need anything else"
 - Be conversational but maintain professionalism
-${sessionContext}${locationContext}${profileContext}${onboardingPrompt}
+${locationContext}${profileContext}${onboardingPrompt}
 
   CRITICAL RULES for place searches - FOLLOW EXACTLY:
     1. ALWAYS call exactly ONE search tool for place discovery per user message.
@@ -2008,7 +1636,7 @@ ${sessionContext}${locationContext}${profileContext}${onboardingPrompt}
     // Handle tool calls if the agent wants to use them
     if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
       console.log(`?? Agent requested ${assistantMessage.tool_calls.length} tool call(s)`);
-
+      
       // Execute all tool calls
       for (const toolCall of assistantMessage.tool_calls) {
         const result = await executeToolCall(toolCall);
@@ -2059,34 +1687,20 @@ ${sessionContext}${locationContext}${profileContext}${onboardingPrompt}
 // MAIN API ENDPOINT
 // ============================================
 
-app.post('/api/message', requireAuth, async (req, res) => {
+app.post('/api/message', async (req, res) => {
   try {
     const { sessionId = 'anon', message = '', consentLocation = false, coords, city, conversationHistory = [] } = req.body;
 
-    // NEW: Track request start time for response time metrics
-    global.requestStartTime = Date.now();
-    
     // Track the question in analytics
     trackQuestion(sessionId, message);
 
     if (activeRequests.get(sessionId)) {
-      return res.json({
-        reply: "I'm processing your previous request. Please wait a moment before sending another.",
-        queued: false
+      return res.json({ 
+        reply: "I'm processing your previous request. Please wait a moment before sending another.", 
+        queued: false 
       });
     }
     activeRequests.set(sessionId, true);
-
-    // TRANSLATION: Detect guest's language
-    const detectedLanguage = await detectLanguage(message);
-    console.log(`🌍 Guest language: ${detectedLanguage}`);
-    
-    // TRANSLATION: If not English, translate message to English for processing
-    let messageInEnglish = message;
-    if (detectedLanguage !== 'en') {
-      messageInEnglish = await translateText(message, 'en');
-      console.log(`🌍 Translated to English: ${messageInEnglish}`);
-    }
 
     // Load guest profile
     let guestProfile = await getGuestProfile(sessionId);
@@ -2098,13 +1712,6 @@ app.post('/api/message', requireAuth, async (req, res) => {
       guestProfile.lastActive = new Date().toISOString();
       await saveGuestProfile(guestProfile);
     }
-    
-    // Track guest's preferred language in profile
-    if (detectedLanguage !== 'en' && (!guestProfile.preferredLanguage || guestProfile.preferredLanguage !== detectedLanguage)) {
-      guestProfile.preferredLanguage = detectedLanguage;
-      await saveGuestProfile(guestProfile);
-      trackGuestPreference('language', detectedLanguage);
-    }
 
     // Make session ID available for tool execution
     global.currentSessionId = sessionId;
@@ -2114,29 +1721,20 @@ app.post('/api/message', requireAuth, async (req, res) => {
     // Use Azure AI Agent if available, otherwise fall back to original logic
     if (USE_AZURE_AI && azureOpenAIClient) {
       try {
-        console.log('🤖 Using Azure AI Agent for message:', messageInEnglish);
+        console.log('?? Using Azure AI Agent for message:', message);
         const browserCoords = consentLocation && coords ? coords : null;
         if (browserCoords) {
-          console.log('📍 Browser location shared:', browserCoords);
+          console.log('?? Browser location shared:', browserCoords);
         }
-        // Pass session info to agent
-        const sessionInfo = req.session ? { guestName: req.session.guestName, roomNumber: req.session.roomNumber } : null;
-        result = await handleAzureAIAgent(messageInEnglish, conversationHistory, guestProfile, browserCoords, sessionInfo);
+        result = await handleAzureAIAgent(message, conversationHistory, guestProfile, browserCoords);
       } catch (error) {
         console.error('Azure AI Agent failed, falling back to original logic:', error.message);
         // Fall back to original logic if Azure AI fails
-        result = await handleOriginalLogic(messageInEnglish, consentLocation, coords, city, guestProfile);
+        result = await handleOriginalLogic(message, consentLocation, coords, city, guestProfile);
       }
     } else {
-      console.log('🔧 Using original logic (Azure AI not configured)');
-      result = await handleOriginalLogic(messageInEnglish, consentLocation, coords, city, guestProfile);
-    }
-
-    // TRANSLATION: If guest's language is not English, translate response back
-    if (detectedLanguage !== 'en' && result.reply) {
-      const translatedReply = await translateText(result.reply, detectedLanguage);
-      result.reply = translatedReply;
-      console.log(`🌍 Response translated back to ${detectedLanguage}`);
+      console.log('?? Using original logic (Azure AI not configured)');
+      result = await handleOriginalLogic(message, consentLocation, coords, city, guestProfile);
     }
 
     activeRequests.delete(sessionId);
@@ -2158,12 +1756,12 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
 
   // Check if this is a new guest needing onboarding
   const isNewGuest = !guestProfile || !guestProfile.onboardingComplete;
-
+  
   if (intent === 'greet' && isNewGuest) {
     // First greeting - ask about interests
     if (!guestProfile.interests || guestProfile.interests.length === 0) {
       reply = 'Welcome! To help you better, what are you most interested in during your stay? (Food & Dining, Arts & Culture, Outdoor Activities, Shopping, Nightlife, or Family Fun)';
-    }
+    } 
     // If they have interests but no dietary info
     else if (!guestProfile.dietary || guestProfile.dietary.length === 0) {
       reply = 'Great! Any dietary preferences I should know about? (Vegetarian, Vegan, Halal, Kosher, Gluten-free, or No restrictions)';
@@ -2218,7 +1816,7 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
     // Check if message might be answering onboarding questions
     if (isNewGuest) {
       const lowerMsg = message.toLowerCase();
-
+      
       // Check if they're answering interests question
       if (!guestProfile.interests || guestProfile.interests.length === 0) {
         const interestMatches = ['food', 'dining', 'art', 'culture', 'outdoor', 'shopping', 'nightlife', 'family'];
@@ -2230,16 +1828,16 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
           if (lowerMsg.includes('shopping')) guestProfile.interests.push('Shopping');
           if (lowerMsg.includes('nightlife')) guestProfile.interests.push('Nightlife');
           if (lowerMsg.includes('family')) guestProfile.interests.push('Family Fun');
-
+          
           await saveGuestProfile(guestProfile);
           reply = 'Great! Any dietary preferences I should know about? (Vegetarian, Vegan, Halal, Kosher, Gluten-free, or No restrictions)';
           return { intent: 'onboarding', reply, suggestions, liveLookup };
         }
       }
-
+      
       // Check if they're answering dietary question
-      if (guestProfile.interests && guestProfile.interests.length > 0 &&
-        (!guestProfile.dietary || guestProfile.dietary.length === 0)) {
+      if (guestProfile.interests && guestProfile.interests.length > 0 && 
+          (!guestProfile.dietary || guestProfile.dietary.length === 0)) {
         const dietaryMatches = ['vegetarian', 'vegan', 'halal', 'kosher', 'gluten', 'no restriction', 'none', 'no'];
         if (dietaryMatches.some(keyword => lowerMsg.includes(keyword))) {
           // Save dietary preference
@@ -2251,7 +1849,7 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
           if (lowerMsg.includes('no restriction') || lowerMsg.includes('none') || lowerMsg === 'no') {
             guestProfile.dietary.push('No restrictions');
           }
-
+          
           guestProfile.onboardingComplete = true;
           await saveGuestProfile(guestProfile);
           reply = 'Perfect! I\'ve saved your preferences. How can I help you today?';
@@ -2259,7 +1857,7 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
         }
       }
     }
-
+    
     const qnaAns = answerFromQnA(message);
     reply = qnaAns || "I'm not sure I understood. Could you please rephrase or tell me one detail (e.g., city or room number)?";
   }
@@ -2282,139 +1880,10 @@ function detectIntent(text) {
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', azureAI: !!azureOpenAIClient }));
 
-// Mount Express tickets router (Mongoose-backed) if available
-try {
-  const ticketsRouter = require('./routes/tickets');
-  if (ticketsRouter) {
-    app.use('/api/tickets', ticketsRouter);
-    console.log('✓ Mongoose tickets router mounted at /api/tickets');
-  }
-} catch (e) {
-  // Router not present or failed to load; continue without it
-  console.warn('Tickets router not mounted (./routes/tickets not found or failed to load)');
-}
-
 // Analytics API endpoint
 app.get('/api/analytics', (req, res) => {
   try {
-    // Calculate actionable insights
-    const totalSatisfaction = analytics.guestSatisfaction.length;
-    const avgSatisfaction = totalSatisfaction > 0 
-      ? analytics.guestSatisfaction.reduce((sum, s) => sum + s.rating, 0) / totalSatisfaction 
-      : 0;
-    
-    const totalRequests = analytics.serviceRequests.length;
-    const resolvedRequests = analytics.serviceRequests.filter(r => r.status === 'resolved');
-    const avgResolutionTime = resolvedRequests.length > 0
-      ? resolvedRequests.reduce((sum, r) => sum + (r.resolutionTime || 0), 0) / resolvedRequests.length
-      : 0;
-    
-    const totalRAG = analytics.ragPerformance.length;
-    const accurateRAG = analytics.ragPerformance.filter(r => r.wasAccurate).length;
-    const ragAccuracy = totalRAG > 0 ? (accurateRAG / totalRAG) * 100 : 0;
-    
-    const totalInteractions = analytics.deflectionRate.successfulSelfService + analytics.deflectionRate.requiredStaff;
-    const deflectionPercentage = totalInteractions > 0 
-      ? (analytics.deflectionRate.successfulSelfService / totalInteractions) * 100 
-      : 0;
-    
-    const avgResponseTime = analytics.responseTimeTracking.length > 0
-      ? analytics.responseTimeTracking.reduce((sum, r) => sum + r.responseTimeMs, 0) / analytics.responseTimeTracking.length
-      : 0;
-    
-    // Peak hours analysis
-    const peakHours = Object.entries(analytics.peakDemandTimes)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([hour, count]) => ({ hour: parseInt(hour), requests: count }));
-    
-    // Top issues
-    const topIssues = Object.entries(analytics.commonIssues)
-      .map(([category, data]) => ({
-        category,
-        count: data.count,
-        avgResolutionTime: data.count > 0 ? data.totalResolutionTime / data.count : 0
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-    
-    // Upsell conversion rate
-    const totalUpsells = analytics.upsellOpportunities.length;
-    const convertedUpsells = analytics.upsellOpportunities.filter(u => u.wasConverted).length;
-    const upsellConversion = totalUpsells > 0 ? (convertedUpsells / totalUpsells) * 100 : 0;
-    
-    // Guest preferences summary
-    const preferencesSummary = {};
-    for (const [category, values] of Object.entries(analytics.guestPreferences)) {
-      preferencesSummary[category] = Object.entries(values)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([value, count]) => ({ value, count }));
-    }
-    
-    // Response to all analytics requests with actionable insights
-    res.json({
-      // GUEST EXPERIENCE METRICS
-      guestExperience: {
-        satisfactionScore: parseFloat(avgSatisfaction.toFixed(2)),
-        totalRatings: totalSatisfaction,
-        recentFeedback: analytics.guestSatisfaction.slice(-10)
-      },
-      
-      // OPERATIONAL EFFICIENCY
-      operations: {
-        totalRequests: totalRequests,
-        resolvedRequests: resolvedRequests.length,
-        avgResolutionTimeMinutes: parseFloat((avgResolutionTime / 60000).toFixed(2)),
-        pendingRequests: analytics.serviceRequests.filter(r => r.status === 'open').length,
-        peakDemandHours: peakHours
-      },
-      
-      // AI PERFORMANCE
-      aiPerformance: {
-        ragAccuracy: parseFloat(ragAccuracy.toFixed(2)),
-        totalQueries: totalRAG,
-        avgResponseTimeMs: parseFloat(avgResponseTime.toFixed(2)),
-        deflectionRate: parseFloat(deflectionPercentage.toFixed(2)),
-        knowledgeGaps: analytics.knowledgeGaps.slice(-20),
-        responseRatings: {
-          total: analytics.responseRatings.length,
-          positive: analytics.responseRatings.filter(r => r.rating === 'positive').length,
-          negative: analytics.responseRatings.filter(r => r.rating === 'negative').length,
-          positiveRate: analytics.responseRatings.length > 0 
-            ? parseFloat(((analytics.responseRatings.filter(r => r.rating === 'positive').length / analytics.responseRatings.length) * 100).toFixed(2))
-            : 0
-        }
-      },
-      
-      // REVENUE OPPORTUNITIES
-      revenue: {
-        upsellConversionRate: parseFloat(upsellConversion.toFixed(2)),
-        totalOpportunities: totalUpsells,
-        converted: convertedUpsells,
-        recentOpportunities: analytics.upsellOpportunities.slice(-10)
-      },
-      
-      // PROCESS IMPROVEMENT
-      insights: {
-        topIssues: topIssues,
-        guestPreferences: preferencesSummary,
-        costSavings: {
-          deflectedInteractions: analytics.deflectionRate.successfulSelfService,
-          estimatedSavings: analytics.deflectionRate.successfulSelfService * 5 // $5 per deflected interaction
-        }
-      },
-      
-      // RAW DATA (for detailed analysis)
-      raw: {
-        serviceRequests: analytics.serviceRequests,
-        ragPerformance: analytics.ragPerformance.slice(-100),
-        responseTracking: analytics.responseTimeTracking.slice(-100),
-        openTickets: (typeof TicketModel !== 'undefined' && TicketModel)
-          ? await TicketModel.find({ status: { $nin: ['closed', 'resolved'] } }).lean()
-          : analytics.tickets.filter(t => t.status !== 'closed' && t.status !== 'resolved')
-      }
-    });
+    res.json(analytics);
   } catch (error) {
     console.error('Analytics API error:', error);
     res.status(500).json({ error: 'Failed to retrieve analytics' });
@@ -2426,125 +1895,20 @@ app.get('/analytics', (req, res) => {
   res.sendFile(path.join(__dirname, 'analytics-dashboard.html'));
 });
 
-// Rate response endpoint (thumbs up/down)
-app.post('/api/rate-response', requireAuth, async (req, res) => {
-  try {
-    const { sessionId, messageId, rating, timestamp } = req.body;
-    
-    if (!sessionId || !messageId || !rating) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    
-    if (rating !== 'positive' && rating !== 'negative') {
-      return res.status(400).json({ error: 'Rating must be "positive" or "negative"' });
-    }
-    
-    // Track the rating
-    trackResponseRating(sessionId, messageId, rating);
-    
-    res.json({ 
-      success: true, 
-      message: 'Rating recorded',
-      rating,
-      messageId
-    });
-  } catch (error) {
-    console.error('Rate response error:', error);
-    res.status(500).json({ error: 'Failed to record rating' });
-  }
-});
-
-// --- AUTHENTICATION ENDPOINTS ---
-
-app.post('/api/login', (req, res) => {
-  try {
-    const { persona, roomNumber, guestName, staffId, password } = req.body;
-
-    if (!persona) {
-      return res.status(400).json({ error: 'Persona (guest/staff) is required' });
-    }
-
-    if (persona === 'guest') {
-      // Guest login
-      if (!roomNumber || !guestName) {
-        return res.status(400).json({ error: 'Room number and name are required' });
-      }
-
-      const result = auth.createGuestSession(roomNumber, guestName);
-      return res.json(result);
-    } else if (persona === 'staff') {
-      // Staff login
-      if (!staffId || !password) {
-        return res.status(400).json({ error: 'Employee ID and password are required' });
-      }
-
-      const verification = auth.verifyStaffCredentials(staffId, password);
-      if (!verification.valid) {
-        return res.status(401).json({ error: verification.error || 'Invalid credentials' });
-      }
-
-      const result = auth.createStaffSession(staffId);
-      return res.json(result);
-    } else {
-      return res.status(400).json({ error: 'Invalid persona' });
-    }
-  } catch (err) {
-    console.error('Login error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/logout', requireAuth, (req, res) => {
-  try {
-    const sessionToken = req.sessionToken;
-    auth.destroySession(sessionToken);
-    return res.json({ success: true, message: 'Logged out successfully' });
-  } catch (err) {
-    console.error('Logout error:', err);
-    return res.status(500).json({ error: 'Logout failed' });
-  }
-});
-
-app.post('/api/verify-session', (req, res) => {
-  try {
-    const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.body.sessionToken;
-    const session = auth.verifySession(sessionToken);
-
-    if (!session) {
-      return res.status(401).json({ valid: false, error: 'Invalid or expired session' });
-    }
-
-    return res.json({ valid: true, session });
-  } catch (err) {
-    console.error('Session verification error:', err);
-    return res.status(500).json({ error: 'Session verification failed' });
-  }
-});
-
-app.get('/api/sessions', requireAuth, (req, res) => {
-  // Only staff can view all sessions (optional authorization check)
-  try {
-    const allSessions = auth.getAllSessions();
-    return res.json({ sessions: allSessions, total: allSessions.length });
-  } catch (err) {
-    console.error('Get sessions error:', err);
-    return res.status(500).json({ error: 'Failed to retrieve sessions' });
-  }
-});
-
 app.listen(PORT, async () => {
   console.log(`?? AI Concierge with Azure AI listening on http://localhost:${PORT}`);
   console.log(`   Azure AI Agent: ${USE_AZURE_AI ? '? Enabled' : '? Disabled'}`);
   console.log(`   Analytics Dashboard: http://localhost:${PORT}/analytics`);
-
+  
   // Initialize RAG system after server starts
   if (USE_AZURE_AI && azureOpenAIClient && hotelKnowledge.length > 0) {
-    console.log('\n?? Initializing RAG system...');
+    console.log('\\n?? Initializing RAG system...');
     await initializeRAG();
+    console.log('?? RAG System Status:', ragInitialized ? '? Ready' : '? Not Available');
   } else {
-    console.log('\n\u26a0\ufe0f  RAG system disabled (requires Azure OpenAI and hotel_knowledge.json)');
+    console.log('\\n\u26a0\ufe0f  RAG system disabled (requires Azure OpenAI and hotel_knowledge.json)');
   }
-
-  console.log('\n??? Server ready! Try asking hotel questions to test RAG semantic search.\n');
+  
+  console.log('\\n??? Server ready! Try asking hotel questions to test RAG semantic search.\\n');
 });
 

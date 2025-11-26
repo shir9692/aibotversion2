@@ -339,102 +339,6 @@
     .ticker-content:hover {
       animation-play-state: paused;
     }
-    .ticker-item {
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .ticker-item:hover {
-      transform: scale(1.05);
-      text-shadow: 0 0 8px rgba(255,255,255,0.5);
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      animation: fadeIn 0.3s ease;
-    }
-    .modal.active {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    .modal-content {
-      background-color: white;
-      padding: 30px;
-      border-radius: 12px;
-      max-width: 500px;
-      width: 90%;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-      animation: slideUp 0.3s ease;
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 12px;
-    }
-    .modal-title {
-      font-size: 22px;
-      font-weight: 600;
-      color: #333;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .close-btn {
-      background: none;
-      border: none;
-      font-size: 28px;
-      cursor: pointer;
-      color: #999;
-      transition: color 0.2s;
-    }
-    .close-btn:hover {
-      color: #333;
-    }
-    .modal-body {
-      margin-bottom: 20px;
-      line-height: 1.6;
-    }
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-    }
-    .modal-btn {
-      padding: 10px 16px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-    .modal-btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-    .modal-btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-    .modal-btn-secondary {
-      background: #f0f0f0;
-      color: #333;
-    }
-    .modal-btn-secondary:hover {
-      background: #e0e0e0;
-    }
   </style>
 </head>
 <body>
@@ -442,15 +346,6 @@
     <div id="chat">
       <!-- Weather & Events Ticker -->
       <div class="ticker-container">
-        <!-- User Profile & Logout Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.3); margin-bottom: 12px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span id="user-avatar" style="font-size: 20px;">👤</span>
-            <span id="user-info" style="font-size: 12px; opacity: 0.9;">Guest</span>
-          </div>
-          <button onclick="handleLogout()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">Logout</button>
-        </div>
-
         <!-- Static Weather Section -->
         <div class="weather-section">
           <div class="weather-info">
@@ -483,24 +378,7 @@
 
       <div id="controls">
         <input id="message" placeholder="Ask me anything..." />
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <label class="small"><input type="checkbox" id="shareLocation" /> 📍 Location</label>
-          <select id="languageSelect" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white;">
-            <option value="auto">🌐 Auto-detect</option>
-            <option value="en">🇺🇸 English</option>
-            <option value="es">🇪🇸 Español</option>
-            <option value="fr">🇫🇷 Français</option>
-            <option value="de">🇩🇪 Deutsch</option>
-            <option value="zh-Hans">🇨🇳 中文</option>
-            <option value="ja">🇯🇵 日本語</option>
-            <option value="ko">🇰🇷 한국어</option>
-            <option value="ar">🇸🇦 العربية</option>
-            <option value="pt">🇧🇷 Português</option>
-            <option value="ru">🇷🇺 Русский</option>
-            <option value="hi">🇮🇳 हिन्दी</option>
-            <option value="it">🇮🇹 Italiano</option>
-          </select>
-        </div>
+        <label class="small"><input type="checkbox" id="shareLocation" /> 📍 Location</label>
         <button id="send">Send</button>
         <label id="diagToggle" class="small"><input type="checkbox" id="showDiag" /> 🔧</label>
       </div>
@@ -598,27 +476,6 @@
     </div>
   </div>
 
-  <!-- Event Modal -->
-  <div id="event-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div class="modal-title">
-          <span id="event-icon"></span>
-          <span id="event-title"></span>
-        </div>
-        <button class="close-btn" onclick="closeEventModal()">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p id="event-description"></p>
-        <div id="event-details" style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 13px;"></div>
-      </div>
-      <div class="modal-actions">
-        <button class="modal-btn modal-btn-secondary" onclick="closeEventModal()">Close</button>
-        <button class="modal-btn modal-btn-primary" onclick="addEventToChat()">Ask Concierge</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     const historyEl = document.getElementById('history');
     const inputEl = document.getElementById('message');
@@ -637,161 +494,11 @@
     let cachedLocation = null;
     const sessionId = 'session-' + Math.random().toString(36).slice(2,9);
     const conversationHistory = [];
-    let sessionToken = null;
-    let userPersona = null;
-    let userInfo = null;
-    let currentEventData = null;
 
-    // Event Modal Functions
-    function openEventModal(eventData) {
-      currentEventData = eventData;
-      document.getElementById('event-icon').textContent = eventData.icon;
-      document.getElementById('event-title').textContent = eventData.title;
-      document.getElementById('event-description').textContent = eventData.description;
-      
-      let detailsHtml = '';
-      if (eventData.details) {
-        detailsHtml = eventData.details.map(detail => `<div style="margin: 6px 0;"><strong>${detail.label}:</strong> ${detail.value}</div>`).join('');
-      }
-      document.getElementById('event-details').innerHTML = detailsHtml || '<em>No additional details available</em>';
-      
-      document.getElementById('event-modal').classList.add('active');
-    }
-
-    function closeEventModal() {
-      document.getElementById('event-modal').classList.remove('active');
-      currentEventData = null;
-    }
-
-    function addEventToChat() {
-      if (!currentEventData) return;
-      
-      const message = `I'm interested in: ${currentEventData.title}. Can you help me with more information or bookings?`;
-      sendMessage(message);
-      closeEventModal();
-    }
-
-    function handleEventClick(eventData) {
-      openEventModal(eventData);
-    }
-
-    // Close modal when clicking outside
-    document.addEventListener('click', (e) => {
-      const modal = document.getElementById('event-modal');
-      if (e.target === modal) {
-        closeEventModal();
-      }
-    });
-
-    // Initialize session on page load
-    async function initializeSession() {
-      // Check if user is logged in
-      sessionToken = localStorage.getItem('sessionToken');
-      userPersona = localStorage.getItem('userPersona');
-      userInfo = localStorage.getItem('userInfo');
-
-      if (!sessionToken) {
-        // Not logged in, redirect to login page
-        window.location.href = 'login.html';
-        return;
-      }
-
-      try {
-        // Verify session with server
-        const response = await fetch('http://localhost:3000/api/verify-session', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + sessionToken
-          }
-        });
-
-        if (!response.ok) {
-          // Session is invalid
-          localStorage.clear();
-          window.location.href = 'login.html';
-          return;
-        }
-
-        // Session is valid, update UI
-        updateUserInfo();
-      } catch (error) {
-        console.error('Session verification failed:', error);
-        localStorage.clear();
-        window.location.href = 'login.html';
-      }
-    }
-
-    function updateUserInfo() {
-      try {
-        const info = JSON.parse(userInfo || '{}');
-        const avatar = document.getElementById('user-avatar');
-        const userDisplay = document.getElementById('user-info');
-
-        if (userPersona === 'guest') {
-          avatar.textContent = '👤';
-          userDisplay.textContent = `${info.guestName || 'Guest'} | Room ${info.roomNumber || '?'}`;
-        } else if (userPersona === 'staff') {
-          avatar.textContent = '👨‍💼';
-          userDisplay.textContent = `${info.staffName || 'Staff'} (Employee)`;
-        }
-      } catch (error) {
-        console.error('Error updating user info:', error);
-      }
-    }
-
-    async function handleLogout() {
-      try {
-        await fetch('http://localhost:3000/api/logout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + sessionToken
-          }
-        });
-      } catch (error) {
-        console.error('Logout error:', error);
-      }
-
-      // Clear local storage
-      localStorage.clear();
-
-      // Redirect to login page
-      window.location.href = 'login.html';
-    }
-
-    function append(text, who='bot', messageId=null) {
+    function append(text, who='bot') {
       const d = document.createElement('div');
       d.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
-      
-      // Create text span
-      const textSpan = document.createElement('span');
-      textSpan.innerText = (who === 'user' ? 'You: ' : 'Bot: ') + text;
-      d.appendChild(textSpan);
-      
-      // Add rating buttons for bot messages
-      if (who === 'bot' && messageId) {
-        const ratingDiv = document.createElement('div');
-        ratingDiv.className = 'rating-buttons';
-        ratingDiv.style.display = 'inline-flex';
-        
-        const thumbsUp = document.createElement('button');
-        thumbsUp.className = 'rating-btn thumbs-up';
-        thumbsUp.innerHTML = '👍';
-        thumbsUp.title = 'Helpful response';
-        thumbsUp.onclick = () => rateResponse(messageId, 'positive', thumbsUp, thumbsDown);
-        
-        const thumbsDown = document.createElement('button');
-        thumbsDown.className = 'rating-btn thumbs-down';
-        thumbsDown.innerHTML = '👎';
-        thumbsDown.title = 'Not helpful';
-        thumbsDown.onclick = () => rateResponse(messageId, 'negative', thumbsUp, thumbsDown);
-        
-        ratingDiv.appendChild(thumbsUp);
-        ratingDiv.appendChild(thumbsDown);
-        d.appendChild(ratingDiv);
-      }
-      
+      d.innerText = (who === 'user' ? 'You: ' : 'Bot: ') + text;
       historyEl.appendChild(d);
       historyEl.scrollTop = historyEl.scrollHeight;
       return d;
@@ -813,38 +520,6 @@
 
     function escapeHtml(str) {
       return String(str).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-    }
-
-    async function rateResponse(messageId, rating, thumbsUpBtn, thumbsDownBtn) {
-      try {
-        const response = await fetch('http://localhost:3000/api/rate-response', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + sessionToken
-          },
-          body: JSON.stringify({
-            sessionId,
-            messageId,
-            rating,
-            timestamp: new Date().toISOString()
-          })
-        });
-        
-        if (response.ok) {
-          // Visual feedback
-          if (rating === 'positive') {
-            thumbsUpBtn.classList.add('selected');
-            thumbsDownBtn.style.display = 'none';
-          } else {
-            thumbsDownBtn.classList.add('selected');
-            thumbsUpBtn.style.display = 'none';
-          }
-          console.log('Rating submitted:', rating);
-        }
-      } catch (error) {
-        console.error('Failed to submit rating:', error);
-      }
     }
 
     function parseCityFromText(text) {
@@ -871,8 +546,8 @@
     });
 
     async function sendMessage(text) {
-      append(text, 'user', null);
-      const botPlaceholder = append('...', 'bot', null);
+      append(text, 'user');
+      const botPlaceholder = append('...', 'bot');
 
       const clientCity = parseCityFromText(text);
       clientCityEl.innerText = clientCity || '""';
@@ -894,25 +569,14 @@
         }
       }
 
-      const payload = { sessionId, message: text, consentLocation, coords, conversationHistory, sessionToken };
+      const payload = { sessionId, message: text, consentLocation, coords, conversationHistory };
 
       try {
         const r = await fetch('http://localhost:3000/api/message', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + sessionToken
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-
-        if (r.status === 401) {
-          // Session expired
-          localStorage.clear();
-          window.location.href = 'login.html';
-          return;
-        }
-
         const json = await r.json();
 
         srvIntentEl.innerText = json.intent || '""';
@@ -920,12 +584,7 @@
         srvReplyEl.innerText = json.reply || '""';
         rawJsonEl.innerText = JSON.stringify(json, null, 2);
 
-        // Generate unique message ID for this response
-        const messageId = json.messageId || 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
-        
-        // Remove placeholder and add new message with rating buttons
-        botPlaceholder.remove();
-        append(json.reply || 'Sorry, something went wrong.', 'bot', messageId);
+        botPlaceholder.innerText = 'Bot: ' + (json.reply || 'Sorry, something went wrong.');
         
         // Track conversation history
         conversationHistory.push({ role: 'user', content: text });
@@ -976,30 +635,26 @@
       try {
         const response = await fetch('http://localhost:3000/api/message', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + sessionToken
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sessionId,
             message: `Create a ticket for ${requestType}. Room ${roomNumber}. Details: ${details || 'No specific details'}`,
             consentLocation: false,
             coords: null,
-            conversationHistory,
-            sessionToken
+            conversationHistory
           })
         });
         
         const result = await response.json();
         
         // Show confirmation in chat
-        append(`Request submitted: ${requestType} for Room ${roomNumber}`, 'user', null);
-        append(result.reply || 'Your request has been submitted. Our team will assist you shortly.', 'bot', null);
+        append(`Request submitted: ${requestType} for Room ${roomNumber}`, 'user');
+        append(result.reply || 'Your request has been submitted. Our team will assist you shortly.', 'bot');
         
         // Refresh analytics to show new ticket
         fetchAnalytics();
       } catch (error) {
-        append(`Failed to submit request. Please try again or contact front desk.`, 'bot', null);
+        append(`Failed to submit request. Please try again or contact front desk.`, 'bot');
       }
     }
 
@@ -1014,23 +669,14 @@
     }
 
     function updateAnalytics(data) {
-      // Show only tickets for the current guest
-      const info = JSON.parse(userInfo || '{}');
-      const guestRoom = info.roomNumber;
-      const guestName = info.guestName;
-      const tickets = (data.tickets || []).filter(t => {
-        // Match by room number or guest name
-        return (t.roomNumber && t.roomNumber == guestRoom) || (t.guestName && t.guestName == guestName);
-      });
-      const openTickets = tickets.filter(t => t.status !== 'closed' && t.status !== 'resolved');
-      const recentTickets = openTickets.slice(-5).reverse();
+      // Recent tickets only
+      const tickets = data.tickets || [];
+      const recentTickets = tickets.slice(-5).reverse();
       const ticketsHtml = recentTickets.length > 0
         ? recentTickets.map(t => `
             <div class="mini-list-item">
-              <span><strong>${t.requestType}</strong> (${t.status || 'open'})</span>
+              <span>${t.requestType}</span>
               <span class="mini-count">${t.ticketId.split('-')[1].slice(0, 6)}</span>
-              <div style="font-size:11px;color:#555;">Room: ${t.roomNumber || '?'} | ${t.guestName || ''}</div>
-              <div style="font-size:11px;color:#888;">${t.description || ''}</div>
             </div>
           `).join('')
         : '<div style="text-align:center; color:#999; padding:10px;">No open requests</div>';
@@ -1040,15 +686,12 @@
       document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString();
     }
 
-    // Initial greeting (no rating needed for greeting)
-    append('Hello! Welcome to AI Concierge. How can I help you today?', 'bot', null);
+    // Initial greeting
+    append('Hello! Welcome to AI Concierge. How can I help you today?');
 
-    // Initialize session and then fetch analytics
-    document.addEventListener('DOMContentLoaded', () => {
-      initializeSession();
-      fetchAnalytics();
-      setInterval(fetchAnalytics, 5000);
-    });
+    // Fetch analytics on load and every 5 seconds
+    fetchAnalytics();
+    setInterval(fetchAnalytics, 5000);
 
     // Update weather and events ticker
     async function updateTicker() {
@@ -1144,203 +787,36 @@
         if (isNYC) {
           // NYC-specific events
           events.push(
-            { 
-              icon: '🎭', 
-              title: 'Broadway Show: Hamilton',
-              text: 'Broadway Show: Hamilton - Richard Rodgers Theatre 8 PM',
-              description: 'Experience the critically acclaimed musical Hamilton at the Richard Rodgers Theatre.',
-              details: [
-                { label: 'Location', value: 'Richard Rodgers Theatre, Times Square' },
-                { label: 'Time', value: '8:00 PM' },
-                { label: 'Duration', value: '2 hours 45 minutes' },
-                { label: 'Price Range', value: '$$ - $$$' }
-              ]
-            },
-            { 
-              icon: '🗽', 
-              title: 'Statue of Liberty Tours',
-              text: 'Statue of Liberty Tours - Departing every hour from Battery Park',
-              description: 'Visit one of America\'s most iconic monuments with guided tours.',
-              details: [
-                { label: 'Location', value: 'Battery Park, Downtown Manhattan' },
-                { label: 'Departures', value: 'Every hour, 9 AM - 5 PM' },
-                { label: 'Duration', value: '3-4 hours' },
-                { label: 'Price', value: '$24.50 per adult' }
-              ]
-            },
-            { 
-              icon: '🎨', 
-              title: 'MoMA Exhibition: Modern Masters',
-              text: 'MoMA Exhibition: Modern Masters - Open until 9 PM',
-              description: 'Explore world-class modern and contemporary art at the Museum of Modern Art.',
-              details: [
-                { label: 'Location', value: 'Museum of Modern Art, Midtown' },
-                { label: 'Hours', value: '10:30 AM - 9:00 PM' },
-                { label: 'Admission', value: '$25 general admission' },
-                { label: 'Highlights', value: 'Picasso, Warhol, Van Gogh' }
-              ]
-            },
-            { 
-              icon: '⚽', 
-              title: 'Yankees Game Tonight',
-              text: 'Yankees Game Tonight - Yankee Stadium 7:30 PM',
-              description: 'Catch the New York Yankees in action at historic Yankee Stadium.',
-              details: [
-                { label: 'Location', value: 'Yankee Stadium, Bronx' },
-                { label: 'Time', value: '7:30 PM' },
-                { label: 'Opponent', value: 'Boston Red Sox' },
-                { label: 'Tickets', value: 'Available at box office' }
-              ]
-            },
-            { 
-              icon: '🎵', 
-              title: `${dayOfWeek} Live Jazz`,
-              text: `${dayOfWeek} Live Jazz - Blue Note Jazz Club 9 PM`,
-              description: 'Enjoy world-class live jazz performances at the legendary Blue Note.',
-              details: [
-                { label: 'Location', value: 'Blue Note Jazz Club, Greenwich Village' },
-                { label: 'Time', value: '9:00 PM' },
-                { label: 'Cover Charge', value: '$20 - $40' },
-                { label: 'Reservations', value: 'Recommended' }
-              ]
-            },
-            { 
-              icon: '🍕', 
-              title: 'Best Pizza Tour',
-              text: 'Best Pizza Tour - Little Italy & Brooklyn',
-              description: 'Taste authentic New York pizza at the city\'s most famous pizzerias.',
-              details: [
-                { label: 'Duration', value: '2.5 hours' },
-                { label: 'Includes', value: '3-4 pizza slices + toppings' },
-                { label: 'Price', value: '$65 per person' },
-                { label: 'Neighborhoods', value: 'Little Italy & Brooklyn' }
-              ]
-            }
+            { icon: '🎭', text: 'Broadway Show: Hamilton - Richard Rodgers Theatre 8 PM' },
+            { icon: '🗽', text: 'Statue of Liberty Tours - Departing every hour from Battery Park' },
+            { icon: '🎨', text: 'MoMA Exhibition: Modern Masters - Open until 9 PM' },
+            { icon: '⚽', text: 'Yankees Game Tonight - Yankee Stadium 7:30 PM' },
+            { icon: '🎵', text: `${dayOfWeek} Live Jazz - Blue Note Jazz Club 9 PM` },
+            { icon: '🍕', text: "Best Pizza Tour - Little Italy & Brooklyn" }
           );
         } else {
           // Generic hotel events for any location
           events.push(
-            { 
-              icon: '🎭', 
-              title: 'Local Theater',
-              text: 'Check Local Theater Performances Tonight',
-              description: 'Discover local theatrical performances and live shows in the area.',
-              details: [
-                { label: 'Type', value: 'Theater & Live Performances' },
-                { label: 'Availability', value: 'Various times' },
-                { label: 'Ask Concierge', value: 'For personalized recommendations' }
-              ]
-            },
-            { 
-              icon: '🎨', 
-              title: 'Museums & Art Galleries',
-              text: 'Visit Local Museums & Art Galleries',
-              description: 'Explore world-class art and cultural institutions nearby.',
-              details: [
-                { label: 'Type', value: 'Museums & Galleries' },
-                { label: 'Variety', value: 'Modern, Classical, Contemporary' },
-                { label: 'Ask Concierge', value: 'For recommendations based on your interests' }
-              ]
-            },
-            { 
-              icon: '🍽️', 
-              title: 'Downtown Dining',
-              text: 'Explore Downtown Restaurants & Cafes',
-              description: 'Discover the finest dining experiences in the area.',
-              details: [
-                { label: 'Cuisines', value: 'International & Local' },
-                { label: 'Price Range', value: '$ - $$$' },
-                { label: 'Ask Concierge', value: 'For reservations & recommendations' }
-              ]
-            },
-            { 
-              icon: '🏛️', 
-              title: 'Historical Sites',
-              text: 'Historical Sites & City Tours Available',
-              description: 'Learn about the rich history of this city through guided tours.',
-              details: [
-                { label: 'Types', value: 'Walking Tours, Bus Tours' },
-                { label: 'Duration', value: '2-4 hours' },
-                { label: 'Ask Concierge', value: 'For booking & information' }
-              ]
-            },
-            { 
-              icon: '🎵', 
-              title: `${dayOfWeek} Live Music`,
-              text: `${dayOfWeek} Live Music - Ask Concierge for Recommendations`,
-              description: 'Enjoy live music performances at local venues.',
-              details: [
-                { label: 'Genres', value: 'Jazz, Rock, Classical, Pop' },
-                { label: 'Venues', value: 'Various throughout the city' },
-                { label: 'Ask Concierge', value: 'For tonight\'s performances' }
-              ]
-            },
-            { 
-              icon: '🚶', 
-              title: 'Walking Tours',
-              text: 'Walking Tours & Local Attractions',
-              description: 'Explore the city on foot with guided neighborhood tours.',
-              details: [
-                { label: 'Routes', value: 'Multiple themed tours available' },
-                { label: 'Duration', value: '2-3 hours' },
-                { label: 'Ask Concierge', value: 'For available tours' }
-              ]
-            }
+            { icon: '🎭', text: `Check Local Theater Performances Tonight` },
+            { icon: '🎨', text: 'Visit Local Museums & Art Galleries' },
+            { icon: '🍽️', text: 'Explore Downtown Restaurants & Cafes' },
+            { icon: '🏛️', text: 'Historical Sites & City Tours Available' },
+            { icon: '🎵', text: `${dayOfWeek} Live Music - Ask Concierge for Recommendations` },
+            { icon: '🚶', text: 'Walking Tours & Local Attractions' }
           );
         }
         
         // Add time-based hotel events (works anywhere)
         events.push(
-          { 
-            icon: '🍽️', 
-            title: hour < 19 ? 'Happy Hour' : 'Late Night Menu',
-            text: hour < 19 ? 'Happy Hour 5-7 PM - Hotel Rooftop Bar' : 'Late Night Menu - Hotel Restaurant until 2 AM',
-            description: hour < 19 ? 'Enjoy discounted drinks and appetizers at our rooftop bar.' : 'Order from our late-night menu available until 2 AM.',
-            details: [
-              { label: 'Location', value: hour < 19 ? 'Hotel Rooftop Bar' : 'Hotel Restaurant' },
-              { label: 'Hours', value: hour < 19 ? '5:00 PM - 7:00 PM' : '11:00 PM - 2:00 AM' },
-              { label: 'Call Extension', value: '2050' }
-            ]
-          },
-          { 
-            icon: '🏃', 
-            title: hour < 7 ? 'Morning Yoga' : 'Evening Fitness',
-            text: hour < 7 ? 'Morning Yoga Class - Hotel Gym 7 AM' : 'Evening Fitness Class - Hotel Gym 6 PM',
-            description: hour < 7 ? 'Start your day with a relaxing yoga session.' : 'Join our evening fitness class to stay active.',
-            details: [
-              { label: 'Location', value: 'Hotel Gym, Level 2' },
-              { label: 'Time', value: hour < 7 ? '7:00 AM' : '6:00 PM' },
-              { label: 'Duration', value: '45 minutes' },
-              { label: 'No Prior Booking', value: 'Drop-in welcome!' }
-            ]
-          },
-          { 
-            icon: '🛎️', 
-            title: 'Concierge Services',
-            text: 'Concierge Services Available 24/7',
-            description: 'Our concierge team is always available to assist with your needs.',
-            details: [
-              { label: 'Services', value: 'Reservations, Bookings, Recommendations' },
-              { label: 'Available', value: '24 hours, 7 days a week' },
-              { label: 'Reach Us', value: 'Dial 0 from your room or visit the lobby' }
-            ]
-          },
-          { 
-            icon: '🚕', 
-            title: 'Express Taxi Service',
-            text: 'Express Taxi Service - Ask Front Desk',
-            description: 'Need a ride? Our express taxi service is fast and reliable.',
-            details: [
-              { label: 'Response Time', value: 'Typically 5-10 minutes' },
-              { label: 'Available', value: '24 hours' },
-              { label: 'Book At', value: 'Front Desk or Call Extension 2000' }
-            ]
-          }
+          { icon: '🍽️', text: hour < 19 ? 'Happy Hour 5-7 PM - Hotel Rooftop Bar' : 'Late Night Menu - Hotel Restaurant until 2 AM' },
+          { icon: '🏃', text: hour < 7 ? 'Morning Yoga Class - Hotel Gym 7 AM' : 'Evening Fitness Class - Hotel Gym 6 PM' },
+          { icon: '🛎️', text: 'Concierge Services Available 24/7' },
+          { icon: '🚕', text: 'Express Taxi Service - Ask Front Desk' }
         );
         
-        // Build rolling events HTML with click handlers (duplicate for seamless loop)
-        const eventsHTML = [...events, ...events].map((e, idx) => 
-          `<div class="ticker-item" onclick="handleEventClick({icon: '${e.icon}', title: '${e.title.replace(/'/g, "\\'")}', description: '${e.description.replace(/'/g, "\\'")}', details: ${JSON.stringify(e.details).replace(/"/g, '&quot;')}})"><span class="ticker-icon">${e.icon}</span>${e.text}</div>`
+        // Build rolling events HTML (duplicate for seamless loop)
+        const eventsHTML = [...events, ...events].map(e => 
+          `<div class="ticker-item"><span class="ticker-icon">${e.icon}</span>${e.text}</div>`
         ).join('');
         
         document.getElementById('ticker-content').innerHTML = eventsHTML;

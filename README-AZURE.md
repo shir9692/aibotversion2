@@ -14,6 +14,13 @@ This chatbot now features:
 - **Multi-turn Conversations** with memory
 - **Managed Identity Security** - No API keys in code
 - **Auto-scaling** on Azure App Service
+- **[RUBRIC ALIGNMENT]** See `ARCHITECTURE.md` and `DIGITAL_TRANSFORMATION.md` for project details.
+
+## 📚 Project Submission Artifacts (For Rubric)
+
+- **[Digital Transformation Strategy](DIGITAL_TRANSFORMATION.md)**: Business problem, solution, ROI, and business model changes.
+- **[System Architecture](ARCHITECTURE.md)**: Technical design, diagrams, technology justification, and NFRs.
+- **[Evaluation Report](evaluate_bot.js)**: Run this script to generate accuracy metrics (`node evaluate_bot.js`).
 
 ## 🚀 Quick Start
 
