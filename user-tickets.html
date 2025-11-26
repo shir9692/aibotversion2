@@ -1,0 +1,61 @@
+﻿<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>User Tickets</title>
+  <style>body{font-family:Segoe UI, Roboto, Arial;padding:20px;background:#f7f9fc} .card{background:#fff;padding:18px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);max-width:900px;margin:20px auto} table{width:100%;border-collapse:collapse} th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left} th{width:180px;color:#333} .btn{display:inline-block;margin:6px;padding:6px 10px;background:#3b82f6;color:#fff;border-radius:6px;text-decoration:none}</style>
+</head>
+<body>
+  <div class="card">
+    <h2>Your Tickets</h2>
+    <div>
+      <label>Guest Name: <input id="guestName" /></label>
+      <label>Room #: <input id="roomNumber" /></label>
+      <button id="loadBtn" class="btn">Load Tickets</button>
+    </div>
+    <div id="tickets"></div>
+  </div>
+<script>
+async function loadTickets() {
+  const guestName = document.getElementById('guestName').value;
+  const roomNumber = document.getElementById('roomNumber').value;
+  const params = new URLSearchParams();
+  if (guestName) params.set('guestName', guestName);
+  if (roomNumber) params.set('roomNumber', roomNumber);
+  const res = await fetch('/api/tickets?' + params.toString());
+  const json = await res.json();
+  const container = document.getElementById('tickets');
+  container.innerHTML = '';
+  (json.tickets||[]).forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    let html = `<h3>Ticket ${t.id || t._id || (t.meta && t.meta.externalId) || '—'}</h3>`;
+    html += `<p><strong>Type:</strong> ${t.requestType} <strong>Priority:</strong> ${t.priority}</p>`;
+    html += `<p>${t.description || ''}</p>`;
+    html += `<p><strong>Status:</strong> ${t.status || ''} <strong>Room:</strong> ${t.roomNumber || ''}</p>`;
+    html += '<h4>Updates</h4>';
+    html += '<div>' + ((t.updates||[]).map(u => `<div><small>${u.createdAt || u.createdAt}</small><br/><strong>${u.author||'Staff'}:</strong> ${u.message || ''} <em>${u.status||''}</em></div>`).join('')) + '</div>';
+    html += `<div style="margin-top:8px"><input placeholder="Your name" class="upd-author" /><input placeholder="Message" class="upd-msg" style="width:60%" /><select class="upd-status"><option value="">(no status change)</option><option>Open</option><option>In Progress</option><option>Resolved</option><option>Closed</option></select> <button class="btn upd-send">Post Update</button></div>`;
+    div.innerHTML = html;
+    container.appendChild(div);
+    div.querySelector('.upd-send').addEventListener('click', async () => {
+      const author = div.querySelector('.upd-author').value;
+      const message = div.querySelector('.upd-msg').value;
+      const status = div.querySelector('.upd-status').value;
+      const ticketId = t.id || t._id || (t.meta && t.meta.externalId);
+      if (!ticketId) { alert('Cannot determine ticket id'); return; }
+      const r = await fetch('/api/tickets/' + ticketId + '/updates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ author, message, status }) });
+      if (r.ok) { alert('Update posted'); loadTickets(); } else { alert('Failed to post update'); }
+    });
+  });
+}
+
+document.getElementById('loadBtn').addEventListener('click', loadTickets);
+// Try to prefill from query params
+const qp = new URLSearchParams(location.search);
+if (qp.get('guestName')) document.getElementById('guestName').value = qp.get('guestName');
+if (qp.get('roomNumber')) document.getElementById('roomNumber').value = qp.get('roomNumber');
+if (qp.get('guestName') || qp.get('roomNumber')) loadTickets();
+</script>
+</body>
+</html>
