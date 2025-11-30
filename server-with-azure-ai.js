@@ -1,20 +1,6 @@
-// Debug endpoint: Show all tickets saved (MongoDB or in-memory)
-app.get('/api/all-tickets', async (req, res) => {
-  try {
-    let allTickets = [];
-    if (TicketModel) {
-      allTickets = await TicketModel.find({}).lean();
-    } else if (USE_COSMOS_DB && ticketsContainer) {
-      const { resources } = await ticketsContainer.items.readAll().fetchAll();
-      allTickets = resources;
-    } else {
-      allTickets = inMemoryTickets;
-    }
-    res.json({ tickets: allTickets });
-  } catch (err) {
-    res.status(500).json({ error: err && err.message ? err.message : err });
-  }
-});
+// ...existing code...
+
+// Move all route definitions below app initialization
 // server-with-azure-ai.js
 // AI Concierge with Azure OpenAI Agentic Integration
 // [RUBRIC: Digital Transformation Solution]
@@ -35,6 +21,8 @@ const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/ident
 const { CosmosClient } = require('@azure/cosmos');
 const auth = require('./auth');
 const TextTranslationClient = require('@azure-rest/ai-translation-text').default;
+
+const app = express();
 
 // Load data files relative to this script directory to avoid CWD issues
 let qna = [];
@@ -63,7 +51,7 @@ try {
   hotelKnowledge = [];
 }
 
-const app = express();
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));  // Serve static files
@@ -2295,7 +2283,7 @@ try {
 }
 
 // Analytics API endpoint
-app.get('/api/analytics', (req, res) => {
+app.get('/api/analytics', async (req, res) => {
   try {
     // Calculate actionable insights
     const totalSatisfaction = analytics.guestSatisfaction.length;
