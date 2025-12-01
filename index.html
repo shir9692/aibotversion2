@@ -557,6 +557,13 @@
           </div>
         </div>
 
+        <!-- Sentiment Metric -->
+        <div class="mini-list">
+          <div class="mini-list-title">😊 Guest Sentiment</div>
+          <canvas id="sentimentChart" width="380" height="60" style="margin-bottom:10px;"></canvas>
+          <div id="latest-sentiment-feedback" style="font-size:13px; color:#555; margin-top:8px;"></div>
+        </div>
+
         <div class="quick-actions">
           <button class="action-btn" onclick="quickAction('Housekeeping', '🧹')">
             <span class="action-icon">🧹</span>
@@ -1039,6 +1046,7 @@
     }
 
     function updateAnalytics(data) {
+
       // Show only tickets for the current guest
       const info = JSON.parse(userInfo || '{}');
       const guestRoom = info.roomNumber;
@@ -1060,6 +1068,56 @@
           `).join('')
         : '<div style="text-align:center; color:#999; padding:10px;">No open requests</div>';
       document.getElementById('recent-tickets-mini').innerHTML = ticketsHtml;
+
+      // Sentiment Metric
+      const sentiments = (data.guestSentiment || []);
+      const sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
+      let latestFeedback = '';
+      let latestSentiment = '';
+      let latestConfidence = '';
+      if (sentiments.length > 0) {
+        sentiments.forEach(s => {
+          if (s.sentiment === 'positive') sentimentCounts.positive++;
+          else if (s.sentiment === 'neutral') sentimentCounts.neutral++;
+          else if (s.sentiment === 'negative') sentimentCounts.negative++;
+        });
+        const last = sentiments[sentiments.length - 1];
+        latestFeedback = last.feedback;
+        latestSentiment = last.sentiment;
+        latestConfidence = last.confidence;
+      }
+
+      // Draw sentiment bar chart
+      const ctx = document.getElementById('sentimentChart').getContext('2d');
+      ctx.clearRect(0, 0, 380, 60);
+      const total = sentimentCounts.positive + sentimentCounts.neutral + sentimentCounts.negative;
+      const barWidth = 100;
+      const startX = 20;
+      const startY = 30;
+      // Positive
+      ctx.fillStyle = '#4ade80';
+      ctx.fillRect(startX, startY, barWidth * (sentimentCounts.positive / (total || 1)), 18);
+      ctx.fillStyle = '#222';
+      ctx.fillText('😊 ' + sentimentCounts.positive, startX + 2, startY + 14);
+      // Neutral
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(startX + barWidth, startY, barWidth * (sentimentCounts.neutral / (total || 1)), 18);
+      ctx.fillStyle = '#222';
+      ctx.fillText('😐 ' + sentimentCounts.neutral, startX + barWidth + 2, startY + 14);
+      // Negative
+      ctx.fillStyle = '#f87171';
+      ctx.fillRect(startX + barWidth * 2, startY, barWidth * (sentimentCounts.negative / (total || 1)), 18);
+      ctx.fillStyle = '#222';
+      ctx.fillText('😞 ' + sentimentCounts.negative, startX + barWidth * 2 + 2, startY + 14);
+
+      // Latest feedback
+      let feedbackHtml = '';
+      if (latestFeedback) {
+        feedbackHtml = `<b>Latest:</b> <span style="color:#667eea">${latestSentiment}</span> (${(latestConfidence * 100).toFixed(1)}%)<br><span style="font-size:12px; color:#333;">"${latestFeedback}"</span>`;
+      } else {
+        feedbackHtml = '<span style="color:#999">No recent feedback</span>';
+      }
+      document.getElementById('latest-sentiment-feedback').innerHTML = feedbackHtml;
 
       // Update refresh time
       document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString();

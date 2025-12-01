@@ -24,6 +24,19 @@ const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/ident
 const { CosmosClient } = require('@azure/cosmos');
 const auth = require('./auth');
 
+// Azure Text Analytics Setup (Sentiment Analysis)
+const { TextAnalyticsClient, AzureKeyCredential } = require('@azure/ai-text-analytics');
+let textAnalyticsClient = null;
+if (process.env.AZURE_TEXT_ANALYTICS_ENDPOINT && process.env.AZURE_TEXT_ANALYTICS_KEY) {
+  textAnalyticsClient = new TextAnalyticsClient(
+    process.env.AZURE_TEXT_ANALYTICS_ENDPOINT,
+    new AzureKeyCredential(process.env.AZURE_TEXT_ANALYTICS_KEY)
+  );
+  console.log('✓ Azure Text Analytics initialized for sentiment analysis');
+} else {
+  console.warn('Azure Text Analytics not configured. Sentiment analysis will be disabled.');
+}
+
 const app = express();
 
 // Load data files relative to this script directory to avoid CWD issues
@@ -139,6 +152,9 @@ const analytics = {
   tickets: [],
   conversions: [],
   locationSearches: {}
+
+  // NEW: Sentiment Analysis
+  , guestSentiment: [] // { sessionId, sentiment, confidence, feedback, timestamp }
 };
 
 function trackQuestion(sessionId, question) {
@@ -196,7 +212,24 @@ function trackLocationSearch(location) {
 }
 
 // NEW: Track guest satisfaction (from feedback)
-function trackGuestSatisfaction(sessionId, rating, feedback = '', category = 'general') {
+
+// NEW: Sentiment analysis helper
+async function analyzeSentiment(text) {
+  if (!textAnalyticsClient || !text) return { sentiment: 'unknown', confidence: 0 };
+  try {
+    const [result] = await textAnalyticsClient.analyzeSentiment([text]);
+    return {
+      sentiment: result.sentiment,
+      confidence: result.confidenceScores[result.sentiment] || 0
+    };
+  } catch (error) {
+    console.error('Sentiment analysis error:', error.message);
+    return { sentiment: 'unknown', confidence: 0 };
+  }
+}
+
+// Track guest satisfaction and sentiment
+async function trackGuestSatisfaction(sessionId, rating, feedback = '', category = 'general') {
   analytics.guestSatisfaction.push({
     sessionId,
     rating, // 1-5 scale
@@ -204,6 +237,19 @@ function trackGuestSatisfaction(sessionId, rating, feedback = '', category = 'ge
     category,
     timestamp: new Date().toISOString()
   });
+
+  // Sentiment analysis for feedback
+  if (feedback && feedback.length > 3) {
+    const sentimentResult = await analyzeSentiment(feedback);
+    analytics.guestSentiment.push({
+      sessionId,
+      sentiment: sentimentResult.sentiment,
+      confidence: sentimentResult.confidence,
+      feedback,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`🧠 Sentiment for guest feedback: ${sentimentResult.sentiment} (${sentimentResult.confidence})`);
+  }
 }
 
 // NEW: Track service request lifecycle

@@ -309,6 +309,13 @@
             </div>
         </div>
 
+        <!-- Sentiment Analysis Section -->
+        <div class="chart-container">
+            <h2>😊 Guest Sentiment Analysis</h2>
+            <div id="sentiment-bar-chart" class="bar-chart"></div>
+            <div id="sentiment-feedback-list"></div>
+        </div>
+
         <!-- Top Service Issues -->
         <div class="list-container">
             <h2>🔧 Most Common Service Requests</h2>
@@ -388,6 +395,15 @@
 
                 // Render Peak Demand Chart
                 renderPeakDemandChart(data.operations.peakDemandHours);
+
+                // Render Sentiment Analysis
+                if (data.guestExperience && data.guestExperience.sentimentByGuest) {
+                    renderSentimentBarChart(data.guestExperience.sentimentByGuest);
+                    renderSentimentFeedbackList(data.guestExperience.sentimentByGuest);
+                } else {
+                    document.getElementById('sentiment-bar-chart').innerHTML = '<div class="empty-state"><p>No sentiment data yet.</p></div>';
+                    document.getElementById('sentiment-feedback-list').innerHTML = '';
+                }
 
                 // Render Top Issues
                 renderTopIssues(data.insights.topIssues);
@@ -477,6 +493,49 @@
             const period = hour >= 12 ? 'PM' : 'AM';
             const displayHour = hour % 12 || 12;
             return `${displayHour}${period}`;
+        }
+
+        // Sentiment Bar Chart Renderer
+        function renderSentimentBarChart(sentimentByGuest) {
+            const chartContainer = document.getElementById('sentiment-bar-chart');
+            if (!sentimentByGuest || Object.keys(sentimentByGuest).length === 0) {
+                chartContainer.innerHTML = '<div class="empty-state"><p>No sentiment data yet.</p></div>';
+                return;
+            }
+            // Prepare data
+            const guests = Object.keys(sentimentByGuest);
+            chartContainer.innerHTML = guests.map(guest => {
+                const score = sentimentByGuest[guest].score;
+                const barHeight = ((score + 1) / 2) * 100; // Normalize to [0,100]
+                let color = score > 0.3 ? '#67eaa2' : score < -0.3 ? '#ea6767' : '#eae767';
+                return `
+                    <div class="bar" style="height: ${barHeight}%; background: ${color};">
+                        <div class="bar-value">${score.toFixed(2)}</div>
+                        <div class="bar-label">${guest}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Sentiment Feedback List Renderer
+        function renderSentimentFeedbackList(sentimentByGuest) {
+            const feedbackContainer = document.getElementById('sentiment-feedback-list');
+            if (!sentimentByGuest || Object.keys(sentimentByGuest).length === 0) {
+                feedbackContainer.innerHTML = '';
+                return;
+            }
+            let html = '<h3 style="margin-top:30px; color:#667eea;">Latest Guest Feedback</h3>';
+            html += '<ul style="list-style:none; padding:0;">';
+            Object.entries(sentimentByGuest).forEach(([guest, obj]) => {
+                if (obj.feedback) {
+                    html += `<li style="margin-bottom:12px; background:#f7f7fa; padding:12px; border-radius:8px;">
+                        <strong>${guest}:</strong> <span style="color:#333;">${obj.feedback}</span>
+                        <span style="float:right; color:#888; font-size:12px;">Sentiment: ${obj.score.toFixed(2)}</span>
+                    </li>`;
+                }
+            });
+            html += '</ul>';
+            feedbackContainer.innerHTML = html;
         }
 
         function renderTopIssues(issues) {
