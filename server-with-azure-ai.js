@@ -1,20 +1,3 @@
-// Debug endpoint: Show all tickets saved (MongoDB or in-memory)
-app.get('/api/all-tickets', async (req, res) => {
-  try {
-    let allTickets = [];
-    if (TicketModel) {
-      allTickets = await TicketModel.find({}).lean();
-    } else if (USE_COSMOS_DB && ticketsContainer) {
-      const { resources } = await ticketsContainer.items.readAll().fetchAll();
-      allTickets = resources;
-    } else {
-      allTickets = inMemoryTickets;
-    }
-    res.json({ tickets: allTickets });
-  } catch (err) {
-    res.status(500).json({ error: err && err.message ? err.message : err });
-  }
-});
 // server-with-azure-ai.js
 // AI Concierge with Azure OpenAI Agentic Integration
 // [RUBRIC: Digital Transformation Solution]
@@ -34,7 +17,6 @@ const { AzureOpenAI } = require('openai');
 const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/identity');
 const { CosmosClient } = require('@azure/cosmos');
 const auth = require('./auth');
-const TextTranslationClient = require('@azure-rest/ai-translation-text').default;
 
 // Load data files relative to this script directory to avoid CWD issues
 let qna = [];
@@ -68,60 +50,6 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));  // Serve static files
 
-// Azure Translator Setup
-const translatorClient = TextTranslationClient(process.env.TRANSLATOR_ENDPOINT || 'https://api.cognitive.microsofttranslator.com/', {
-  key: process.env.TRANSLATOR_KEY,
-  region: process.env.TRANSLATOR_REGION || 'eastus2'
-});
-
-// Translation helper functions
-async function detectLanguage(text) {
-  try {
-    if (!text || text.trim().length === 0) return 'en';
-    
-    const response = await translatorClient.path('/detect').post({
-      body: [{ text: text }],
-      queryParameters: { 'api-version': '3.0' }
-    });
-    
-    const result = response.body;
-    if (result && result[0] && result[0].language) {
-      const detectedLang = result[0].language;
-      console.log(`🌐 Detected language: ${detectedLang}`);
-      return detectedLang;
-    }
-    return 'en';
-  } catch (error) {
-    console.error('Language detection error:', error.message);
-    return 'en'; // Default to English on error
-  }
-}
-
-async function translateText(text, targetLanguage) {
-  try {
-    if (!text || targetLanguage === 'en') return text;
-    
-    const response = await translatorClient.path('/translate').post({
-      body: [{ text: text }],
-      queryParameters: {
-        'api-version': '3.0',
-        'to': [targetLanguage]
-      }
-    });
-    
-    const result = response.body;
-    if (result && result[0] && result[0].translations && result[0].translations[0]) {
-      const translated = result[0].translations[0].text;
-      console.log(`🌐 Translated to ${targetLanguage}: ${text.substring(0, 50)}... → ${translated.substring(0, 50)}...`);
-      return translated;
-    }
-    return text;
-  } catch (error) {
-    console.error('Translation error:', error.message);
-    return text; // Return original text on error
-  }
-}
-
 // Mongoose (MongoDB / Cosmos DB - Mongo API) connection (optional)
 const mongoose = require('mongoose');
 const MONGO_URI = process.env.MONGO_URI;
@@ -143,19 +71,7 @@ try {
 
 const PORT = process.env.PORT || 3000;
 
-// --- Authentication middleware ---
-function requireAuth(req, res, next) {
-  const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.body.sessionToken;
-  const session = auth.verifySession(sessionToken);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized - Invalid or expired session' });
-  }
-
-  req.session = session;
-  req.sessionToken = sessionToken;
-  next();
-}
+// ============================================
 // COSMOS DB SETUP FOR TICKETING
 // ============================================
 
@@ -207,7 +123,6 @@ const analytics = {
   // OPERATIONAL QUALITY
   responseTimeTracking: [],  // { timestamp, responseTimeMs, wasRag, satisfactory }
   knowledgeGaps: [],      // { query, noAnswer, timestamp } - what to add to knowledge base
-  responseRatings: [],    // { sessionId, messageId, rating, timestamp } - thumbs up/down ratings
   
   // Legacy (kept for backward compatibility, but not displayed)
   sessions: {},           
@@ -284,7 +199,7 @@ function trackGuestSatisfaction(sessionId, rating, feedback = '', category = 'ge
 }
 
 // NEW: Track service request lifecycle
-function trackServiceRequest(ticketId, type, priority, status = 'open', responseTime = null, resolutionTime = null, guestName = null, roomNumber = null, description = null) {
+function trackServiceRequest(ticketId, type, priority, status = 'open', responseTime = null, resolutionTime = null) {
   const existing = analytics.serviceRequests.find(r => r.ticketId === ticketId);
   if (existing) {
     existing.status = status;
@@ -298,9 +213,6 @@ function trackServiceRequest(ticketId, type, priority, status = 'open', response
       status,
       responseTime,
       resolutionTime,
-      guestName,
-      roomNumber,
-      description,
       createdAt: new Date().toISOString()
     });
   }
@@ -403,22 +315,6 @@ function trackGuestPreference(category, value) {
   }
   analytics.guestPreferences[category][value] = 
     (analytics.guestPreferences[category][value] || 0) + 1;
-}
-
-function trackResponseRating(sessionId, messageId, rating) {
-  analytics.responseRatings.push({
-    sessionId,
-    messageId,
-    rating, // 'positive' or 'negative'
-    timestamp: new Date().toISOString()
-  });
-  
-  // Keep only last 1000 ratings
-  if (analytics.responseRatings.length > 1000) {
-    analytics.responseRatings.shift();
-  }
-  
-  console.log(`📊 Response rated: ${rating} (Message: ${messageId}, Session: ${sessionId})`);
 }
 
 // ============================================
@@ -646,6 +542,71 @@ async function answerWithRAG(query) {
       similarity: doc.similarity.toFixed(3)
     }))
   };
+}
+
+// ============================================
+// LLM FALLBACK - Ask Azure OpenAI directly when RAG has no matches
+// ============================================
+// FALLBACK CASCADE:
+// 1. Try RAG (semantic search on knowledge base) -> If matches found, return
+// 2. If no RAG matches, ask Azure OpenAI LLM directly -> Grounded in hotel context
+// 3. Fallback to keyword QnA if LLM fails
+//
+// This ensures guests always get helpful answers while preferring knowledge-base accuracy.
+// ============================================
+
+async function answerWithLLMFallback(query, hotelContext = null) {
+  if (!azureOpenAIClient) {
+    console.log('❌ Azure OpenAI not available for LLM fallback');
+    return null;
+  }
+
+  try {
+    console.log('🤖 Attempting LLM fallback (RAG had no matches)...');
+
+    const systemPrompt = `You are a helpful hotel concierge AI assistant. Answer the guest's question clearly and directly.
+${hotelContext ? `\n\nHotel Context:\n${hotelContext}` : ''}
+
+Guidelines:
+- Be friendly and professional
+- Provide specific, actionable information
+- If you don't know something, be honest and suggest they contact hotel staff
+- Keep responses concise (2-3 sentences max unless asking for details)
+- For hotel policies/amenities you're unsure about, recommend contacting the front desk`;
+
+    const response = await azureOpenAIClient.chat.completions.create({
+      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        {
+          role: 'user',
+          content: query
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 300
+    });
+
+    if (response && response.usage) logTokenUsage(response.usage, 'llm-fallback');
+
+    const answer = response.choices[0].message.content;
+    
+    console.log('✅ LLM fallback generated response');
+    
+    return {
+      answer: answer,
+      sources: [],
+      method: 'LLM_FALLBACK',
+      confidence: 0.5 // Lower confidence than RAG since it's not grounded in knowledge base
+    };
+
+  } catch (error) {
+    console.error('❌ LLM fallback error:', error.message);
+    return null;
+  }
 }
 
 // ============================================
@@ -1563,13 +1524,15 @@ async function executeToolCall(toolCall) {
     }
 
     case 'getHotelInfo': {
-      // Try RAG first (semantic search), fallback to keyword QnA
+      // CASCADE STRATEGY: RAG -> LLM Fallback -> QnA Fallback
+      
+      // STEP 1: Try RAG first (semantic search on knowledge base)
       if (ragInitialized) {
         const ragResult = await answerWithRAG(args.query);
         if (ragResult) {
           console.log(`✅ Answered using RAG with ${ragResult.sources.length} sources`);
           
-          // NEW: Track RAG performance
+          // Track RAG performance
           const avgConfidence = ragResult.sources.reduce((sum, s) => sum + parseFloat(s.similarity), 0) / ragResult.sources.length;
           trackRAGPerformance(args.query, avgConfidence, ragResult.sources.length, true);
           trackDeflection(true); // RAG answered = deflected from staff
@@ -1583,25 +1546,47 @@ async function executeToolCall(toolCall) {
             query: args.query
           };
         } else {
-          // RAG couldn't find answer - track knowledge gap
+          console.log(`⚠️  RAG found no matches for: "${args.query}"`);
+          // RAG couldn't find answer - track knowledge gap for later analysis
           trackKnowledgeGap(args.query);
         }
       }
 
-      // Fallback to keyword-based QnA
+      // STEP 2: Try LLM fallback (Azure OpenAI) if RAG has no matches
+      const llmResult = await answerWithLLMFallback(args.query, 'Guest is staying at a hotel and asking about hotel services/policies.');
+      if (llmResult) {
+        console.log(`🤖 Answered using LLM fallback`);
+        
+        trackRAGPerformance(args.query, llmResult.confidence || 0.5, 0, true); // Track as lower confidence
+        trackDeflection(true); // LLM answered = deflected from staff
+        trackResponseTime(Date.now() - (global.requestStartTime || Date.now()), false, true);
+        
+        return {
+          success: true,
+          answer: llmResult.answer,
+          sources: llmResult.sources,
+          method: 'LLM_FALLBACK',
+          query: args.query,
+          note: '(Generated via AI - use front desk for critical policies)'
+        };
+      }
+
+      // STEP 3: Fallback to keyword-based QnA
       const answer = answerFromQnA(args.query);
       
       if (answer) {
+        console.log(`📋 Answered using keyword QnA`);
         trackDeflection(true); // QnA answered = deflected
         trackResponseTime(Date.now() - (global.requestStartTime || Date.now()), false, true);
       } else {
+        console.log(`❌ No answer found in any method for: "${args.query}"`);
         trackKnowledgeGap(args.query);
       }
       
       return {
         success: true,
-        answer: answer || 'I don\'t have that specific information. Please contact hotel staff.',
-        method: 'QnA',
+        answer: answer || 'I don\'t have that specific information. Please contact hotel staff for accurate details.',
+        method: answer ? 'QnA' : 'NONE',
         query: args.query
       };
     }
@@ -1617,12 +1602,10 @@ async function executeToolCall(toolCall) {
 
     case 'createTicket': {
       const ticketId = `TKT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      // Use session info if available (guest is logged in)
-      const sessionInfo = global.sessionInfo || {};
       const ticket = {
         id: ticketId,
-        guestName: args.guestName || sessionInfo.guestName || 'Guest',
-        roomNumber: args.roomNumber || sessionInfo.roomNumber || 'Not specified',
+        guestName: args.guestName || 'Guest',
+        roomNumber: args.roomNumber || 'Not specified',
         requestType: args.requestType,
         priority: args.priority || 'Medium',
         description: args.description,
@@ -1675,18 +1658,8 @@ async function executeToolCall(toolCall) {
         const sessionId = global.currentSessionId || 'unknown';
         trackTicket(sessionId, ticketId, args.requestType);
         
-        // NEW: Track service request for operations dashboard (with full ticket details)
-        trackServiceRequest(
-          ticketId, 
-          args.requestType, 
-          args.priority || 'Medium', 
-          'open',
-          null,  // responseTime
-          null,  // resolutionTime
-          ticket.guestName,
-          ticket.roomNumber,
-          ticket.description
-        );
+        // NEW: Track service request for operations dashboard
+        trackServiceRequest(ticketId, args.requestType, args.priority || 'Medium', 'open');
         trackCommonIssue(args.requestType);
         trackPeakDemand();
         trackDeflection(false); // Ticket created = not deflected
@@ -1839,14 +1812,13 @@ async function executeToolCall(toolCall) {
 // AZURE AI AGENT CONVERSATION HANDLER
 // ============================================
 
-async function handleAzureAIAgent(userMessage, conversationHistory = [], guestProfile = null, browserCoords = null, sessionInfo = null) {
+async function handleAzureAIAgent(userMessage, conversationHistory = [], guestProfile = null, browserCoords = null) {
   if (!azureOpenAIClient) {
     throw new Error('Azure OpenAI client not initialized');
   }
 
-  // Store browser coordinates and session info globally for tool access
+  // Store browser coordinates globally for tool access
   global.browserCoords = browserCoords;
-  global.sessionInfo = sessionInfo;
 
   // Check if this is a new guest (no profile) for onboarding
   const isNewGuest = !guestProfile || !guestProfile.onboardingComplete;
@@ -1855,17 +1827,6 @@ async function handleAzureAIAgent(userMessage, conversationHistory = [], guestPr
     - Latitude: ${browserCoords.lat}
     - Longitude: ${browserCoords.lon}
     - When user says "near me", "nearby", "around here", use BROWSER_COORDS as the location parameter instead of a city name.`
-    : '';
-
-  const sessionContext = sessionInfo
-    ? `\n\nLOGGED-IN GUEST INFORMATION (automatically available - DO NOT ask for this):
-    - Guest Name: ${sessionInfo.guestName}
-    - Room Number: ${sessionInfo.roomNumber}
-    
-    ⚠️ CRITICAL: When creating tickets with createTicket tool, ALWAYS use these values:
-    - guestName: "${sessionInfo.guestName}"
-    - roomNumber: "${sessionInfo.roomNumber}"
-    NEVER ask the guest for their name or room number - you already have it!`
     : '';
 
   const profileContext = guestProfile && guestProfile.onboardingComplete
@@ -1931,7 +1892,7 @@ Communication style:
 - Use phrases like "I'd be delighted to help", "Wonderful!", "Let me find that for you"
 - End interactions with encouraging notes like "Enjoy your visit!", "Have a great time!", or "Please let me know if you need anything else"
 - Be conversational but maintain professionalism
-${sessionContext}${locationContext}${profileContext}${onboardingPrompt}
+${locationContext}${profileContext}${onboardingPrompt}
 
   CRITICAL RULES for place searches - FOLLOW EXACTLY:
     1. ALWAYS call exactly ONE search tool for place discovery per user message.
@@ -2059,9 +2020,9 @@ ${sessionContext}${locationContext}${profileContext}${onboardingPrompt}
 // MAIN API ENDPOINT
 // ============================================
 
-app.post('/api/message', requireAuth, async (req, res) => {
+app.post('/api/message', async (req, res) => {
   try {
-    const { sessionId = 'anon', message = '', consentLocation = false, coords, city, conversationHistory = [] } = req.body;
+    const { sessionId = 'anon', message = '', consentLocation = false, coords, city, conversationHistory = [], lastPlace } = req.body;
 
     // NEW: Track request start time for response time metrics
     global.requestStartTime = Date.now();
@@ -2077,17 +2038,6 @@ app.post('/api/message', requireAuth, async (req, res) => {
     }
     activeRequests.set(sessionId, true);
 
-    // TRANSLATION: Detect guest's language
-    const detectedLanguage = await detectLanguage(message);
-    console.log(`🌍 Guest language: ${detectedLanguage}`);
-    
-    // TRANSLATION: If not English, translate message to English for processing
-    let messageInEnglish = message;
-    if (detectedLanguage !== 'en') {
-      messageInEnglish = await translateText(message, 'en');
-      console.log(`🌍 Translated to English: ${messageInEnglish}`);
-    }
-
     // Load guest profile
     let guestProfile = await getGuestProfile(sessionId);
     if (!guestProfile) {
@@ -2098,13 +2048,6 @@ app.post('/api/message', requireAuth, async (req, res) => {
       guestProfile.lastActive = new Date().toISOString();
       await saveGuestProfile(guestProfile);
     }
-    
-    // Track guest's preferred language in profile
-    if (detectedLanguage !== 'en' && (!guestProfile.preferredLanguage || guestProfile.preferredLanguage !== detectedLanguage)) {
-      guestProfile.preferredLanguage = detectedLanguage;
-      await saveGuestProfile(guestProfile);
-      trackGuestPreference('language', detectedLanguage);
-    }
 
     // Make session ID available for tool execution
     global.currentSessionId = sessionId;
@@ -2114,29 +2057,20 @@ app.post('/api/message', requireAuth, async (req, res) => {
     // Use Azure AI Agent if available, otherwise fall back to original logic
     if (USE_AZURE_AI && azureOpenAIClient) {
       try {
-        console.log('🤖 Using Azure AI Agent for message:', messageInEnglish);
+        console.log('?? Using Azure AI Agent for message:', message);
         const browserCoords = consentLocation && coords ? coords : null;
         if (browserCoords) {
-          console.log('📍 Browser location shared:', browserCoords);
+          console.log('?? Browser location shared:', browserCoords);
         }
-        // Pass session info to agent
-        const sessionInfo = req.session ? { guestName: req.session.guestName, roomNumber: req.session.roomNumber } : null;
-        result = await handleAzureAIAgent(messageInEnglish, conversationHistory, guestProfile, browserCoords, sessionInfo);
+        result = await handleAzureAIAgent(message, conversationHistory, guestProfile, browserCoords);
       } catch (error) {
         console.error('Azure AI Agent failed, falling back to original logic:', error.message);
         // Fall back to original logic if Azure AI fails
-        result = await handleOriginalLogic(messageInEnglish, consentLocation, coords, city, guestProfile);
+        result = await handleOriginalLogic(message, consentLocation, coords, city, guestProfile, lastPlace);
       }
     } else {
-      console.log('🔧 Using original logic (Azure AI not configured)');
-      result = await handleOriginalLogic(messageInEnglish, consentLocation, coords, city, guestProfile);
-    }
-
-    // TRANSLATION: If guest's language is not English, translate response back
-    if (detectedLanguage !== 'en' && result.reply) {
-      const translatedReply = await translateText(result.reply, detectedLanguage);
-      result.reply = translatedReply;
-      console.log(`🌍 Response translated back to ${detectedLanguage}`);
+      console.log('?? Using original logic (Azure AI not configured)');
+      result = await handleOriginalLogic(message, consentLocation, coords, city, guestProfile, lastPlace);
     }
 
     activeRequests.delete(sessionId);
@@ -2150,7 +2084,7 @@ app.post('/api/message', requireAuth, async (req, res) => {
 });
 
 // Original logic function (from your existing server.js)
-async function handleOriginalLogic(message, consentLocation, coords, city, guestProfile) {
+async function handleOriginalLogic(message, consentLocation, coords, city, guestProfile, lastPlace) {
   const intent = detectIntent(message);
   let reply = '';
   let suggestions = null;
@@ -2201,6 +2135,25 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
         suggestions = result.places;
       } else {
         reply = "I couldn't find live attraction data right now. Would you like general suggestions instead?";
+      }
+    }
+  } else if (intent === 'place_details') {
+    // User is asking for details about a place
+    if (!lastPlace) {
+      reply = 'Which place would you like more information about? You can select one from the suggestions above or tell me the name.';
+    } else {
+      // Try to get details for the last selected place
+      const details = await getPlaceDetails(lastPlace.name, lastPlace.lat, lastPlace.lon);
+      if (details) {
+        reply = `Here's what I found about **${details.name}**:\n\n`;
+        reply += `📍 Location: ${details.address}\n`;
+        if (details.amenity) reply += `🏷️ Type: ${details.amenity}\n`;
+        if (details.hours) reply += `⏰ Hours: ${details.hours}\n`;
+        if (details.phone) reply += `📞 Phone: ${details.phone}\n`;
+        if (details.website) reply += `🌐 Website: ${details.website}\n`;
+        reply += `\nWould you like directions, recommendations, or more details?`;
+      } else {
+        reply = `I tried to get more details about ${lastPlace.name}, but I couldn't find additional information right now. Try asking "places near [city]" to see more options.`;
       }
     }
   } else if (intent === 'transport') {
@@ -2277,7 +2230,50 @@ function detectIntent(text) {
   if (t.includes('translate') || t.startsWith('translate') || t.includes('in spanish') || t.includes('to spanish')) return 'translation';
   if (t.includes('near') || t.includes('nearby') || t.includes('attraction') || t.includes('things to do') || t.includes('restaurants near')) return 'local_attractions';
   if (t.includes('thanks') || t.includes('thank you') || t.includes('bye') || t.includes('goodbye')) return 'small_talk';
+  if (t.includes('detail') || t.includes('more info') || t.includes('more information') || t.includes('tell me about') || t.includes('what is') || t.includes('info about')) return 'place_details';
   return 'unknown';
+}
+
+// Fetch detailed information about a place from Nominatim
+async function getPlaceDetails(placeName, lat, lon) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse.php?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+    
+    const res = await fetchWithRetry(url, {
+      timeoutMs: 4000,
+      headers: { 'User-Agent': 'ai-concierge-mvp/0.1 (mailto:you@example.com)' }
+    }, 2, 700);
+    
+    const data = await res.json();
+    
+    if (!data || !data.address) {
+      return null;
+    }
+    
+    // Build a human-readable summary from reverse geocoding data
+    const address = data.address;
+    const type = data.type || 'location';
+    const displayName = data.display_name || placeName;
+    
+    // Extract relevant address components
+    let details = {
+      name: placeName || data.name || 'Unknown Place',
+      type: type,
+      address: displayName,
+      amenity: address.amenity || address.tourist_attraction || address.leisure || '',
+      city: address.city || address.town || address.village || '',
+      state: address.state || '',
+      country: address.country || '',
+      website: data.extratags && data.extratags.website ? data.extratags.website : '',
+      phone: data.extratags && data.extratags.phone ? data.extratags.phone : '',
+      hours: data.extratags && data.extratags.opening_hours ? data.extratags.opening_hours : ''
+    };
+    
+    return details;
+  } catch (err) {
+    console.error('Error fetching place details:', err && err.message ? err.message : err);
+    return null;
+  }
 }
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', azureAI: !!azureOpenAIClient }));
@@ -2376,15 +2372,7 @@ app.get('/api/analytics', (req, res) => {
         totalQueries: totalRAG,
         avgResponseTimeMs: parseFloat(avgResponseTime.toFixed(2)),
         deflectionRate: parseFloat(deflectionPercentage.toFixed(2)),
-        knowledgeGaps: analytics.knowledgeGaps.slice(-20),
-        responseRatings: {
-          total: analytics.responseRatings.length,
-          positive: analytics.responseRatings.filter(r => r.rating === 'positive').length,
-          negative: analytics.responseRatings.filter(r => r.rating === 'negative').length,
-          positiveRate: analytics.responseRatings.length > 0 
-            ? parseFloat(((analytics.responseRatings.filter(r => r.rating === 'positive').length / analytics.responseRatings.length) * 100).toFixed(2))
-            : 0
-        }
+        knowledgeGaps: analytics.knowledgeGaps.slice(-20)
       },
       
       // REVENUE OPPORTUNITIES
@@ -2409,10 +2397,7 @@ app.get('/api/analytics', (req, res) => {
       raw: {
         serviceRequests: analytics.serviceRequests,
         ragPerformance: analytics.ragPerformance.slice(-100),
-        responseTracking: analytics.responseTimeTracking.slice(-100),
-        openTickets: (typeof TicketModel !== 'undefined' && TicketModel)
-          ? await TicketModel.find({ status: { $nin: ['closed', 'resolved'] } }).lean()
-          : analytics.tickets.filter(t => t.status !== 'closed' && t.status !== 'resolved')
+        responseTracking: analytics.responseTimeTracking.slice(-100)
       }
     });
   } catch (error) {
@@ -2426,35 +2411,9 @@ app.get('/analytics', (req, res) => {
   res.sendFile(path.join(__dirname, 'analytics-dashboard.html'));
 });
 
-// Rate response endpoint (thumbs up/down)
-app.post('/api/rate-response', requireAuth, async (req, res) => {
-  try {
-    const { sessionId, messageId, rating, timestamp } = req.body;
-    
-    if (!sessionId || !messageId || !rating) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    
-    if (rating !== 'positive' && rating !== 'negative') {
-      return res.status(400).json({ error: 'Rating must be "positive" or "negative"' });
-    }
-    
-    // Track the rating
-    trackResponseRating(sessionId, messageId, rating);
-    
-    res.json({ 
-      success: true, 
-      message: 'Rating recorded',
-      rating,
-      messageId
-    });
-  } catch (error) {
-    console.error('Rate response error:', error);
-    res.status(500).json({ error: 'Failed to record rating' });
-  }
-});
-
-// --- AUTHENTICATION ENDPOINTS ---
+// ============================================
+// AUTHENTICATION ENDPOINTS
+// ============================================
 
 app.post('/api/login', (req, res) => {
   try {
@@ -2494,10 +2453,12 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-app.post('/api/logout', requireAuth, (req, res) => {
+app.post('/api/logout', (req, res) => {
   try {
-    const sessionToken = req.sessionToken;
-    auth.destroySession(sessionToken);
+    const { sessionToken } = req.body;
+    if (sessionToken) {
+      auth.destroySession(sessionToken);
+    }
     return res.json({ success: true, message: 'Logged out successfully' });
   } catch (err) {
     console.error('Logout error:', err);
@@ -2507,9 +2468,12 @@ app.post('/api/logout', requireAuth, (req, res) => {
 
 app.post('/api/verify-session', (req, res) => {
   try {
-    const sessionToken = req.headers.authorization?.replace('Bearer ', '') || req.body.sessionToken;
-    const session = auth.verifySession(sessionToken);
+    const { sessionToken } = req.body;
+    if (!sessionToken) {
+      return res.status(401).json({ valid: false, error: 'No session token provided' });
+    }
 
+    const session = auth.verifySession(sessionToken);
     if (!session) {
       return res.status(401).json({ valid: false, error: 'Invalid or expired session' });
     }
@@ -2517,18 +2481,7 @@ app.post('/api/verify-session', (req, res) => {
     return res.json({ valid: true, session });
   } catch (err) {
     console.error('Session verification error:', err);
-    return res.status(500).json({ error: 'Session verification failed' });
-  }
-});
-
-app.get('/api/sessions', requireAuth, (req, res) => {
-  // Only staff can view all sessions (optional authorization check)
-  try {
-    const allSessions = auth.getAllSessions();
-    return res.json({ sessions: allSessions, total: allSessions.length });
-  } catch (err) {
-    console.error('Get sessions error:', err);
-    return res.status(500).json({ error: 'Failed to retrieve sessions' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

@@ -641,6 +641,7 @@
     let userPersona = null;
     let userInfo = null;
     let currentEventData = null;
+    let lastSelectedPlace = null;  // Track the last clicked place suggestion
 
     // Event Modal Functions
     function openEventModal(eventData) {
@@ -701,9 +702,11 @@
         const response = await fetch('http://localhost:3000/api/verify-session', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + sessionToken
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sessionToken: sessionToken
+          })
         });
 
         if (!response.ok) {
@@ -745,9 +748,11 @@
         await fetch('http://localhost:3000/api/logout', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + sessionToken
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sessionToken: sessionToken
+          })
         });
       } catch (error) {
         console.error('Logout error:', error);
@@ -800,6 +805,7 @@
     function appendSuggestion(s) {
       const el = document.createElement('div');
       el.className = 'suggestion';
+      el.style.cursor = 'pointer';
       el.innerHTML = `<strong>${escapeHtml(s.name)}</strong> <span class="small">(${escapeHtml(s.type)})</span>`;
       if (s.reason) {
         const r = document.createElement('div');
@@ -807,6 +813,25 @@
         r.innerText = `Reason: ${s.reason}`;
         el.appendChild(r);
       }
+      
+      // Add click handler to select place and ask for more details
+      el.onclick = () => {
+        lastSelectedPlace = s;  // Store the selected place
+        const detailsRequest = `Tell me more about ${escapeHtml(s.name)}`;
+        append(detailsRequest, 'user', null);
+        sendMessage(detailsRequest);
+      };
+      
+      // Add hover effect
+      el.onmouseenter = () => {
+        el.style.backgroundColor = '#f0f0f0';
+        el.style.fontWeight = 'bold';
+      };
+      el.onmouseleave = () => {
+        el.style.backgroundColor = '';
+        el.style.fontWeight = 'normal';
+      };
+      
       historyEl.appendChild(el);
       historyEl.scrollTop = historyEl.scrollHeight;
     }
@@ -894,7 +919,7 @@
         }
       }
 
-      const payload = { sessionId, message: text, consentLocation, coords, conversationHistory, sessionToken };
+      const payload = { sessionId, message: text, consentLocation, coords, conversationHistory, sessionToken, lastPlace: lastSelectedPlace };
 
       try {
         const r = await fetch('http://localhost:3000/api/message', {

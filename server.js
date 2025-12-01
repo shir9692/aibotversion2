@@ -342,12 +342,56 @@ function detectIntent(text) {
   if (t.includes('translate') || t.startsWith('translate') || t.includes('in spanish') || t.includes('to spanish')) return 'translation';
   if (t.includes('near') || t.includes('nearby') || t.includes('attraction') || t.includes('things to do') || t.includes('restaurants near')) return 'local_attractions';
   if (t.includes('thanks') || t.includes('thank you') || t.includes('bye') || t.includes('goodbye')) return 'small_talk';
+  if (t.includes('detail') || t.includes('more info') || t.includes('more information') || t.includes('tell me about') || t.includes('what is') || t.includes('info about')) return 'place_details';
   return 'unknown';
+}
+
+// Fetch detailed information about a place from Nominatim
+async function getPlaceDetails(placeName, lat, lon) {
+  try {
+    const query = lat && lon ? `${lat},${lon}` : placeName;
+    const url = `https://nominatim.openstreetmap.org/reverse.php?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+    
+    const res = await fetchWithRetry(url, {
+      timeoutMs: 4000,
+      headers: { 'User-Agent': 'ai-concierge-mvp/0.1 (mailto:you@example.com)' }
+    }, 2, 700);
+    
+    const data = await res.json();
+    
+    if (!data || !data.address) {
+      return null;
+    }
+    
+    // Build a human-readable summary from reverse geocoding data
+    const address = data.address;
+    const type = data.type || 'location';
+    const displayName = data.display_name || placeName;
+    
+    // Extract relevant address components
+    let details = {
+      name: placeName || data.name || 'Unknown Place',
+      type: type,
+      address: displayName,
+      amenity: address.amenity || address.tourist_attraction || address.leisure || '',
+      city: address.city || address.town || address.village || '',
+      state: address.state || '',
+      country: address.country || '',
+      website: data.extratags && data.extratags.website ? data.extratags.website : '',
+      phone: data.extratags && data.extratags.phone ? data.extratags.phone : '',
+      hours: data.extratags && data.extratags.opening_hours ? data.extratags.opening_hours : ''
+    };
+    
+    return details;
+  } catch (err) {
+    console.error('Error fetching place details:', err && err.message ? err.message : err);
+    return null;
+  }
 }
 
 app.post('/api/message', requireAuth, async (req, res) => {
   try {
-    const { sessionId = 'anon', message = '', consentLocation = false, coords, city } = req.body;
+    const { sessionId = 'anon', message = '', consentLocation = false, coords, city, lastPlace } = req.body;
 
     if (activeRequests.get(sessionId)) {
       return res.json({ reply: "I'm processing your previous request. Please wait a moment before sending another.", queued: false });
@@ -391,6 +435,25 @@ app.post('/api/message', requireAuth, async (req, res) => {
           suggestions = result.places;
         } else {
           reply = "I couldn't find live attraction data right now. Would you like general suggestions instead?";
+        }
+      }
+    } else if (intent === 'place_details') {
+      // User is asking for details about a place
+      if (!lastPlace) {
+        reply = 'Which place would you like more information about? You can select one from the suggestions above or tell me the name.';
+      } else {
+        // Try to get details for the last selected place
+        const details = await getPlaceDetails(lastPlace.name, lastPlace.lat, lastPlace.lon);
+        if (details) {
+          reply = `Here's what I found about **${details.name}**:\n\n`;
+          reply += `📍 Location: ${details.address}\n`;
+          if (details.amenity) reply += `🏷️ Type: ${details.amenity}\n`;
+          if (details.hours) reply += `⏰ Hours: ${details.hours}\n`;
+          if (details.phone) reply += `📞 Phone: ${details.phone}\n`;
+          if (details.website) reply += `🌐 Website: ${details.website}\n`;
+          reply += `\nWould you like directions, recommendations, or more details?`;
+        } else {
+          reply = `I tried to get more details about ${lastPlace.name}, but I couldn't find additional information right now. Try asking "places near [city]" to see more options.`;
         }
       }
     } else if (intent === 'transport') {
