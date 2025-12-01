@@ -1,3 +1,9 @@
+<<<<<<< HEAD
+=======
+// ...existing code...
+
+// Move all route definitions below app initialization
+>>>>>>> b70f73f78a2c08d4fce2bf5f1f1313f0697995ad
 // server-with-azure-ai.js
 // AI Concierge with Azure OpenAI Agentic Integration
 // [RUBRIC: Digital Transformation Solution]
@@ -17,6 +23,8 @@ const { AzureOpenAI } = require('openai');
 const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/identity');
 const { CosmosClient } = require('@azure/cosmos');
 const auth = require('./auth');
+
+const app = express();
 
 // Load data files relative to this script directory to avoid CWD issues
 let qna = [];
@@ -45,7 +53,7 @@ try {
   hotelKnowledge = [];
 }
 
-const app = express();
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));  // Serve static files
@@ -2291,7 +2299,7 @@ try {
 }
 
 // Analytics API endpoint
-app.get('/api/analytics', (req, res) => {
+app.get('/api/analytics', async (req, res) => {
   try {
     // Calculate actionable insights
     const totalSatisfaction = analytics.guestSatisfaction.length;
