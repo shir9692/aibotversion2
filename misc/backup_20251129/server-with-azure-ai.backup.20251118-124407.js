@@ -1,3 +1,7 @@
+// server-with-azure-ai.js
+// AI Concierge with Azure OpenAI Agentic Integration
+// Enhanced version with Azure AI agent capabilities for intelligent conversation and function calling
+
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -10,27 +14,10 @@ const USAGE_LOG_PATH = path.join(__dirname, 'usage.log.jsonl');
 const { AzureOpenAI } = require('openai');
 const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/identity');
 const { CosmosClient } = require('@azure/cosmos');
-const auth = require('./auth');
-
-// Azure Text Analytics Setup (Sentiment Analysis)
-const { TextAnalyticsClient, AzureKeyCredential } = require('@azure/ai-text-analytics');
-let textAnalyticsClient = null;
-if (process.env.AZURE_TEXT_ANALYTICS_ENDPOINT && process.env.AZURE_TEXT_ANALYTICS_KEY) {
-  textAnalyticsClient = new TextAnalyticsClient(
-    process.env.AZURE_TEXT_ANALYTICS_ENDPOINT,
-    new AzureKeyCredential(process.env.AZURE_TEXT_ANALYTICS_KEY)
-  );
-  console.log('✓ Azure Text Analytics initialized for sentiment analysis');
-} else {
-  console.warn('Azure Text Analytics not configured. Sentiment analysis will be disabled.');
-}
-
-const app = express();
 
 // Load data files relative to this script directory to avoid CWD issues
 let qna = [];
 let FALLBACK_PLACES = [];
-let hotelKnowledge = [];
 try {
   const qnaPath = path.join(__dirname, 'qna.json');
   qna = JSON.parse(fs.readFileSync(qnaPath, 'utf8'));
@@ -45,41 +32,11 @@ try {
   console.error('Failed to load fallback_places.json:', e && e.message ? e.message : e);
   FALLBACK_PLACES = [];
 }
-try {
-  const knowledgePath = path.join(__dirname, 'hotel_knowledge.json');
-  hotelKnowledge = JSON.parse(fs.readFileSync(knowledgePath, 'utf8'));
-  console.log(`✅ Loaded ${hotelKnowledge.length} hotel knowledge documents`);
-} catch (e) {
-  console.error('Failed to load hotel_knowledge.json:', e && e.message ? e.message : e);
-  hotelKnowledge = [];
-}
 
-
+const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));  // Serve static files
-
-// Mongoose (MongoDB / Cosmos DB - Mongo API) connection (optional)
-const mongoose = require('mongoose');
-const MONGO_URI = process.env.MONGO_URI;
-if (!MONGO_URI) {
-  console.warn('MONGO_URI not set. If you want Mongo (Cosmos Mongo API) persistence, set MONGO_URI in .env');
-} else {
-  mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => {
-      console.log('✓ Connected to MongoDB (via MONGO_URI)');
-      loadHistoricalData();
-    })
-    .catch(err => console.error('✗ MongoDB connection error (MONGO_URI):', err && err.message ? err.message : err));
-}
-
-// Optional: Mongoose Ticket model (used to persist tickets created by the agent)
-let TicketModel = null;
-try {
-  TicketModel = require('./models/Ticket');
-} catch (e) {
-  TicketModel = null;
-}
 
 const PORT = process.env.PORT || 3000;
 
@@ -110,112 +67,22 @@ if (USE_COSMOS_DB) {
 const inMemoryTickets = [];
 
 // ============================================
-// ANALYTICS TRACKING SYSTEM - ACTIONABLE BUSINESS INSIGHTS
+// ANALYTICS TRACKING SYSTEM
 // ============================================
 
 const analytics = {
-  // [RUBRIC: Key Performance Indicators (KPIs)]
-  // Business-focused metrics for decision making:
-
-  // GUEST-FACING INSIGHTS
-  guestSatisfaction: [],  // { sessionId, rating, feedback, timestamp, category }
-  serviceRequests: [],    // { ticketId, type, priority, responseTime, resolutionTime, status }
-  peakDemandTimes: {},    // hour -> requestCount (identifies staffing needs)
-
-  // HOTEL OPERATIONS INSIGHTS
-  ragPerformance: [],     // { query, confidence, sourcesUsed, wasAccurate, timestamp }
-  commonIssues: {},       // issueCategory -> { count, avgResolutionTime, staffAssigned }
-  upsellOpportunities: [],// { sessionId, recommendation, category, wasConverted, timestamp }
-
-  // REVENUE & EFFICIENCY
-  deflectionRate: { successfulSelfService: 0, requiredStaff: 0 }, // Cost savings metric
-  staffEfficiency: {},    // staffId -> { ticketsHandled, avgResponseTime, satisfaction }
-  guestPreferences: {},   // dietary/interests patterns for personalization
-
-  // OPERATIONAL QUALITY
-  responseTimeTracking: [],  // { timestamp, responseTimeMs, wasRag, satisfactory }
-  knowledgeGaps: [],      // { query, noAnswer, timestamp } - what to add to knowledge base
-
-  // Legacy (kept for backward compatibility, but not displayed)
-  sessions: {},
-  questions: {},
-  failedQueries: [],
-  tickets: [],
-  conversions: [],
-  locationSearches: {}
-
-  // NEW: Sentiment Analysis
-  , guestSentiment: [] // { sessionId, sentiment, confidence, feedback, timestamp }
+  sessions: {},           // sessionId -> { messageCount, firstSeen, lastSeen }
+  questions: {},          // question -> count
+  failedQueries: [],      // { query, reason, timestamp, sessionId }
+  tickets: [],            // { ticketId, requestType, timestamp, sessionId }
+  conversions: [],        // { type, value, timestamp, sessionId }
+  locationSearches: {}    // location -> count
 };
-
-// Function to load historical data from MongoDB on startup
-async function loadHistoricalData() {
-  if (!TicketModel) return;
-
-  try {
-    console.log('🔄 Loading historical tickets from MongoDB...');
-    const tickets = await TicketModel.find({}).sort({ createdAt: 1 });
-
-    if (tickets.length === 0) {
-      console.log('ℹ️ No historical tickets found.');
-      return;
-    }
-
-    console.log(`✅ Found ${tickets.length} historical tickets. Populating analytics...`);
-
-    tickets.forEach(t => {
-      // 1. Populate serviceRequests (for dashboard list)
-      analytics.serviceRequests.push({
-        ticketId: t.meta && t.meta.externalId ? t.meta.externalId : (t._id.toString()),
-        _id: t._id.toString(), // Keep Mongo ID for reference
-        type: t.requestType,
-        requestType: t.requestType, // Duplicate for compatibility
-        priority: t.priority || 'Medium',
-        status: t.status,
-        guestName: t.guestName,
-        roomNumber: t.roomNumber,
-        description: t.description,
-        createdAt: t.createdAt,
-        timestamp: t.createdAt // For sorting
-      });
-
-      // 2. Populate legacy tickets array
-      analytics.tickets.push({
-        sessionId: 'historical',
-        ticketId: t.meta && t.meta.externalId ? t.meta.externalId : t._id.toString(),
-        requestType: t.requestType,
-        timestamp: t.createdAt,
-        status: t.status,
-        roomNumber: t.roomNumber,
-        guestName: t.guestName,
-        description: t.description
-      });
-
-      // 3. Track common issues
-      if (!analytics.commonIssues[t.requestType]) {
-        analytics.commonIssues[t.requestType] = { count: 0, totalResolutionTime: 0 };
-      }
-      analytics.commonIssues[t.requestType].count++;
-
-      // 4. Track peak demand (hour of day)
-      if (t.createdAt) {
-        const date = new Date(t.createdAt);
-        const hour = date.getHours();
-        analytics.peakDemandTimes[hour] = (analytics.peakDemandTimes[hour] || 0) + 1;
-      }
-    });
-
-    console.log('✅ Analytics dashboard populated with historical data.');
-
-  } catch (error) {
-    console.error('❌ Failed to load historical data:', error);
-  }
-}
 
 function trackQuestion(sessionId, question) {
   const normalized = question.toLowerCase().trim();
   analytics.questions[normalized] = (analytics.questions[normalized] || 0) + 1;
-
+  
   if (!analytics.sessions[sessionId]) {
     analytics.sessions[sessionId] = {
       messageCount: 0,
@@ -234,7 +101,7 @@ function trackFailedQuery(sessionId, query, reason) {
     reason,
     timestamp: new Date().toISOString()
   });
-
+  
   // Keep only last 100 failed queries
   if (analytics.failedQueries.length > 100) {
     analytics.failedQueries.shift();
@@ -248,7 +115,7 @@ function trackTicket(sessionId, ticketId, requestType) {
     requestType,
     timestamp: new Date().toISOString()
   });
-
+  
   // Track as conversion
   trackConversion(sessionId, 'ticket_created', requestType);
 }
@@ -264,166 +131,6 @@ function trackConversion(sessionId, type, value = null) {
 
 function trackLocationSearch(location) {
   analytics.locationSearches[location] = (analytics.locationSearches[location] || 0) + 1;
-}
-
-// NEW: Track guest satisfaction (from feedback)
-
-// NEW: Sentiment analysis helper
-async function analyzeSentiment(text) {
-  if (!textAnalyticsClient || !text) return { sentiment: 'unknown', confidence: 0 };
-  try {
-    const [result] = await textAnalyticsClient.analyzeSentiment([text]);
-    return {
-      sentiment: result.sentiment,
-      confidence: result.confidenceScores[result.sentiment] || 0
-    };
-  } catch (error) {
-    console.error('Sentiment analysis error:', error.message);
-    return { sentiment: 'unknown', confidence: 0 };
-  }
-}
-
-// Track guest satisfaction and sentiment
-async function trackGuestSatisfaction(sessionId, rating, feedback = '', category = 'general') {
-  analytics.guestSatisfaction.push({
-    sessionId,
-    rating, // 1-5 scale
-    feedback,
-    category,
-    timestamp: new Date().toISOString()
-  });
-
-  // Sentiment analysis for feedback
-  if (feedback && feedback.length > 3) {
-    const sentimentResult = await analyzeSentiment(feedback);
-    analytics.guestSentiment.push({
-      sessionId,
-      sentiment: sentimentResult.sentiment,
-      confidence: sentimentResult.confidence,
-      feedback,
-      timestamp: new Date().toISOString()
-    });
-    console.log(`🧠 Sentiment for guest feedback: ${sentimentResult.sentiment} (${sentimentResult.confidence})`);
-  }
-}
-
-// NEW: Track service request lifecycle
-function trackServiceRequest(ticketId, type, priority, status = 'open', responseTime = null, resolutionTime = null) {
-  const existing = analytics.serviceRequests.find(r => r.ticketId === ticketId);
-  if (existing) {
-    existing.status = status;
-    existing.responseTime = responseTime;
-    existing.resolutionTime = resolutionTime;
-  } else {
-    analytics.serviceRequests.push({
-      ticketId,
-      type,
-      priority,
-      status,
-      responseTime,
-      resolutionTime,
-      createdAt: new Date().toISOString()
-    });
-  }
-}
-
-// NEW: Track peak demand for staffing optimization
-function trackPeakDemand() {
-  const hour = new Date().getHours();
-  analytics.peakDemandTimes[hour] = (analytics.peakDemandTimes[hour] || 0) + 1;
-}
-
-// NEW: Track RAG performance for quality monitoring
-function trackRAGPerformance(query, confidence, sourcesUsed, wasAccurate = true) {
-  analytics.ragPerformance.push({
-    query,
-    confidence,
-    sourcesUsed,
-    wasAccurate,
-    timestamp: new Date().toISOString()
-  });
-
-  // Keep only last 500 entries
-  if (analytics.ragPerformance.length > 500) {
-    analytics.ragPerformance.shift();
-  }
-}
-
-// NEW: Track common issues for process improvement
-function trackCommonIssue(category, resolutionTime = null, staffAssigned = null) {
-  if (!analytics.commonIssues[category]) {
-    analytics.commonIssues[category] = {
-      count: 0,
-      totalResolutionTime: 0,
-      staffAssignments: {}
-    };
-  }
-
-  analytics.commonIssues[category].count++;
-  if (resolutionTime) {
-    analytics.commonIssues[category].totalResolutionTime += resolutionTime;
-  }
-  if (staffAssigned) {
-    analytics.commonIssues[category].staffAssignments[staffAssigned] =
-      (analytics.commonIssues[category].staffAssignments[staffAssigned] || 0) + 1;
-  }
-}
-
-// NEW: Track upsell opportunities
-function trackUpsell(sessionId, recommendation, category, wasConverted = false) {
-  analytics.upsellOpportunities.push({
-    sessionId,
-    recommendation,
-    category,
-    wasConverted,
-    timestamp: new Date().toISOString()
-  });
-}
-
-// NEW: Track deflection rate (AI resolved vs staff needed)
-function trackDeflection(wasDeflected) {
-  if (wasDeflected) {
-    analytics.deflectionRate.successfulSelfService++;
-  } else {
-    analytics.deflectionRate.requiredStaff++;
-  }
-}
-
-// NEW: Track response time
-function trackResponseTime(responseTimeMs, wasRag, satisfactory = true) {
-  analytics.responseTimeTracking.push({
-    timestamp: new Date().toISOString(),
-    responseTimeMs,
-    wasRag,
-    satisfactory
-  });
-
-  // Keep only last 1000 entries
-  if (analytics.responseTimeTracking.length > 1000) {
-    analytics.responseTimeTracking.shift();
-  }
-}
-
-// NEW: Track knowledge gaps
-function trackKnowledgeGap(query) {
-  analytics.knowledgeGaps.push({
-    query,
-    timestamp: new Date().toISOString()
-  });
-
-  // Keep only last 100 entries
-  if (analytics.knowledgeGaps.length > 100) {
-    analytics.knowledgeGaps.shift();
-  }
-}
-
-// NEW: Track guest preferences for personalization
-function trackGuestPreference(category, value) {
-  if (!analytics.guestPreferences[category]) {
-    analytics.guestPreferences[category] = {};
-  }
-  analytics.guestPreferences[category][value] =
-    (analytics.guestPreferences[category][value] || 0) + 1;
 }
 
 // ============================================
@@ -455,7 +162,7 @@ const inMemoryProfiles = new Map();
 // Profile helper functions
 async function getGuestProfile(sessionId) {
   if (!sessionId) return null;
-
+  
   try {
     if (USE_PROFILES_DB && profilesContainer) {
       const { resource } = await profilesContainer.item(sessionId, sessionId).read();
@@ -500,233 +207,7 @@ function createNewProfile(sessionId) {
 }
 
 // ============================================
-// RAG SYSTEM - SEMANTIC SEARCH WITH EMBEDDINGS
-// ============================================
-
-// ============================================
-// RAG SYSTEM - SEMANTIC SEARCH WITH EMBEDDINGS
-// [RUBRIC: Methods & Algorithms]
-// Implements Retrieval-Augmented Generation (RAG) to ground AI responses in factual hotel data.
-// Uses Cosine Similarity on Vector Embeddings to find the most relevant policy documents.
-// ============================================
-
-let knowledgeBaseEmbeddings = []; // Store documents with their embeddings
-let ragInitialized = false;
-
-// Cosine similarity function
-function cosineSimilarity(vecA, vecB) {
-  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
-
-  let dotProduct = 0;
-  let magA = 0;
-  let magB = 0;
-
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    magA += vecA[i] * vecA[i];
-    magB += vecB[i] * vecB[i];
-  }
-
-  magA = Math.sqrt(magA);
-  magB = Math.sqrt(magB);
-
-  if (magA === 0 || magB === 0) return 0;
-  return dotProduct / (magA * magB);
-}
-
-// Generate embedding for text using Azure OpenAI
-async function generateEmbedding(text) {
-  if (!azureOpenAIClient) return null;
-
-  try {
-    // Create a new client specifically for embeddings with correct deployment
-    const embeddingClient = new AzureOpenAI({
-      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview',
-      deployment: 'text-embedding-ada-002' // Use embedding deployment name
-    });
-
-    const response = await embeddingClient.embeddings.create({
-      model: 'text-embedding-ada-002',
-      input: text.substring(0, 8000) // Limit to 8000 chars
-    });
-
-    return response.data[0].embedding;
-  } catch (error) {
-    console.error('Embedding generation error:', error.message);
-    return null;
-  }
-}
-
-// Initialize RAG knowledge base with embeddings
-async function initializeRAG() {
-  if (!azureOpenAIClient || hotelKnowledge.length === 0) {
-    console.log('⚠️  RAG not initialized - Azure OpenAI or knowledge base missing');
-    return;
-  }
-
-  console.log('🔄 Initializing RAG system - generating embeddings...');
-
-  try {
-    const startTime = Date.now();
-
-    // Generate embeddings for all knowledge documents
-    for (const doc of hotelKnowledge) {
-      const text = `${doc.title}. ${doc.content}`;
-      const embedding = await generateEmbedding(text);
-
-      if (embedding) {
-        knowledgeBaseEmbeddings.push({
-          ...doc,
-          embedding: embedding
-        });
-      }
-
-      // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    ragInitialized = true;
-    console.log(`✅ RAG initialized with ${knowledgeBaseEmbeddings.length} documents in ${duration}s`);
-    console.log(`🎯 RAG System Status: ✓ Ready\n`);
-  } catch (error) {
-    console.error('❌ RAG initialization failed:', error.message);
-  }
-}
-
-// Semantic search function - finds relevant documents using cosine similarity
-async function semanticSearch(query, topK = 3) {
-  if (!ragInitialized || knowledgeBaseEmbeddings.length === 0) {
-    console.log('⚠️  RAG not initialized, cannot perform semantic search');
-    return [];
-  }
-
-  try {
-    // Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
-    if (!queryEmbedding) return [];
-
-    // Calculate similarity scores for all documents
-    const scoredDocs = knowledgeBaseEmbeddings.map(doc => ({
-      ...doc,
-      similarity: cosineSimilarity(queryEmbedding, doc.embedding)
-    }));
-
-    // Sort by similarity and return top K relevant documents (with threshold)
-    const relevantDocs = scoredDocs
-      .filter(doc => doc.similarity > 0.7) // Only return if similarity > 70%
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, topK);
-
-    console.log(`🔍 Semantic search found ${relevantDocs.length} relevant documents (threshold: 0.7)`);
-
-    return relevantDocs;
-  } catch (error) {
-    console.error('Semantic search error:', error.message);
-    return [];
-  }
-}
-
-// Answer question using RAG
-async function answerWithRAG(query) {
-  const relevantDocs = await semanticSearch(query, 3);
-
-  if (relevantDocs.length === 0) {
-    return null; // No relevant documents found
-  }
-
-  // Build context from relevant documents
-  const context = relevantDocs.map((doc, idx) =>
-    `Document ${idx + 1} (${doc.category}): ${doc.content}`
-  ).join('\n\n');
-
-  // Return answer with source documents
-  return {
-    answer: context,
-    sources: relevantDocs.map(doc => ({
-      title: doc.title,
-      category: doc.category,
-      similarity: doc.similarity.toFixed(3)
-    }))
-  };
-}
-
-// ============================================
-// LLM FALLBACK - Ask Azure OpenAI directly when RAG has no matches
-// ============================================
-// FALLBACK CASCADE:
-// 1. Try RAG (semantic search on knowledge base) -> If matches found, return
-// 2. If no RAG matches, ask Azure OpenAI LLM directly -> Grounded in hotel context
-// 3. Fallback to keyword QnA if LLM fails
-//
-// This ensures guests always get helpful answers while preferring knowledge-base accuracy.
-// ============================================
-
-async function answerWithLLMFallback(query, hotelContext = null) {
-  if (!azureOpenAIClient) {
-    console.log('❌ Azure OpenAI not available for LLM fallback');
-    return null;
-  }
-
-  try {
-    console.log('🤖 Attempting LLM fallback (RAG had no matches)...');
-
-    const systemPrompt = `You are a helpful hotel concierge AI assistant. Answer the guest's question clearly and directly.
-${hotelContext ? `\n\nHotel Context:\n${hotelContext}` : ''}
-
-Guidelines:
-- Be friendly and professional
-- Provide specific, actionable information
-- If you don't know something, be honest and suggest they contact hotel staff
-- Keep responses concise (2-3 sentences max unless asking for details)
-- For hotel policies/amenities you're unsure about, recommend contacting the front desk`;
-
-    const response = await azureOpenAIClient.chat.completions.create({
-      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: query
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 300
-    });
-
-    if (response && response.usage) logTokenUsage(response.usage, 'llm-fallback');
-
-    const answer = response.choices[0].message.content;
-
-    console.log('✅ LLM fallback generated response');
-
-    return {
-      answer: answer,
-      sources: [],
-      method: 'LLM_FALLBACK',
-      confidence: 0.5 // Lower confidence than RAG since it's not grounded in knowledge base
-    };
-
-  } catch (error) {
-    console.error('❌ LLM fallback error:', error.message);
-    return null;
-  }
-}
-
-// ============================================
 // AZURE OPENAI AGENT SETUP
-// ============================================
-
-// ============================================
-// AZURE OPENAI AGENT SETUP
-// [RUBRIC: Technologies & Justification]
-// Selected Azure OpenAI for enterprise-grade security, compliance (GDPR/HIPAA), and reliability.
-// Uses GPT-4 for complex reasoning and "function calling" capabilities.
 // ============================================
 
 let azureOpenAIClient = null;
@@ -753,7 +234,7 @@ if (USE_AZURE_AI) {
       const credential = new DefaultAzureCredential();
       const scope = 'https://cognitiveservices.azure.com/.default';
       const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
+      
       azureOpenAIClient = new AzureOpenAI({
         endpoint,
         azureADTokenProvider,
@@ -798,13 +279,13 @@ const agentTools = [
     type: 'function',
     function: {
       name: 'getHotelInfo',
-      description: 'REQUIRED for ALL hotel-related questions. Call this tool to get accurate information about: hotel policies (check-in/out times, cancellation), amenities (WiFi password, pool, fitness center, parking), services (breakfast, room service, housekeeping), pet policy, accessibility features, payment methods, and any other hotel facility or policy questions. This tool uses semantic search to find the most relevant information from the hotel knowledge base.',
+      description: 'Get information about hotel amenities, policies, check-in/out times, WiFi, breakfast, etc.',
       parameters: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
-            description: 'The hotel-related question exactly as the guest asked it (e.g., "can I bring my cat?", "what time is check in?", "is there free wifi?", "where do I park?")'
+            description: 'The hotel-related question (e.g., "check-in time", "wifi password", "breakfast hours")'
           }
         },
         required: ['query']
@@ -1000,7 +481,7 @@ function answerFromQnA(text) {
   const fuseResults = fuse.search(userNorm);
   if (process.env.QNA_DEBUG) {
     console.log('[QNA DEBUG] user text:', text);
-    console.log('[QNA DEBUG] fuse results (top 5):', (fuseResults || []).slice(0, 5).map(r => ({ q: r.item.question, score: r.score })));
+    console.log('[QNA DEBUG] fuse results (top 5):', (fuseResults || []).slice(0,5).map(r => ({ q: r.item.question, score: r.score })));
   }
 
   if (!fuseResults || fuseResults.length === 0) return null;
@@ -1028,7 +509,7 @@ function logTokenUsage(usage, stage) {
       model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'unknown',
       prompt_tokens: usage.prompt_tokens ?? usage.promptTokens ?? 0,
       completion_tokens: usage.completion_tokens ?? usage.completionTokens ?? 0,
-      total_tokens: usage.total_tokens ?? usage.totalTokens ?? ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0))
+      total_tokens: usage.total_tokens ?? usage.totalTokens ?? ((usage.prompt_tokens||0) + (usage.completion_tokens||0))
     };
     fs.appendFileSync(USAGE_LOG_PATH, JSON.stringify(rec) + '\n', 'utf8');
   } catch (e) {
@@ -1160,7 +641,7 @@ async function geocodeCity(cityName) {
       headers: { 'User-Agent': 'HotelConciergeBot/1.0' },
       signal: AbortSignal.timeout(5000)
     });
-
+    
     if (response.ok) {
       const data = await response.json();
       if (data && data.length > 0) {
@@ -1183,7 +664,7 @@ async function geocodeCity(cityName) {
 // ============================================
 async function fetchWeatherData(location) {
   const WEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
-
+  
   if (!WEATHER_API_KEY || WEATHER_API_KEY === 'demo') {
     // Return mock data if no API key configured
     return {
@@ -1226,13 +707,13 @@ async function fetchWeatherData(location) {
     // Fetch current weather
     const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=imperial`;
     const response = await fetchWithRetry(weatherUrl, { timeoutMs: 5000 });
-
+    
     if (!response.ok) {
       throw new Error(`Weather API returned ${response.status}`);
     }
 
     const data = await response.json();
-
+    
     return {
       success: true,
       location: data.name || cityName,
@@ -1278,9 +759,9 @@ function generateWeatherAdvice(weatherData) {
 async function searchEvents(location, eventType = 'all', timeframe = 'this_week') {
   // Using Ticketmaster Discovery API for real event data
   // Docs: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
-
+  
   const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY;
-
+  
   if (!TICKETMASTER_API_KEY || TICKETMASTER_API_KEY === 'demo') {
     // Return curated mock events when no API key configured
     return {
@@ -1336,7 +817,7 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
     // Build Ticketmaster API URL - radius in miles
     const radiusMiles = 15;
     let apiUrl = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TICKETMASTER_API_KEY}&latlong=${coords.lat},${coords.lon}&radius=${radiusMiles}&unit=miles&size=20&sort=date,asc`;
-
+    
     // Add event type classification
     if (eventType && eventType !== 'all') {
       const classificationMap = {
@@ -1356,8 +837,8 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
     // Add date range
     const now = new Date();
     let startDateTime, endDateTime;
-
-    switch (timeframe) {
+    
+    switch(timeframe) {
       case 'tonight':
         startDateTime = new Date(now);
         startDateTime.setHours(18, 0, 0, 0);
@@ -1400,9 +881,9 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
     }
 
     console.log('Calling Ticketmaster API');
-
+    
     const response = await fetchWithRetry(apiUrl, { timeoutMs: 5000 });
-
+    
     if (!response.ok) {
       const errorBody = await response.text();
       console.error('Ticketmaster error response:', response.status, errorBody);
@@ -1411,22 +892,22 @@ async function searchEvents(location, eventType = 'all', timeframe = 'this_week'
 
     const data = await response.json();
     const eventsList = data._embedded?.events || [];
-
+    
     console.log('Ticketmaster returned', eventsList.length, 'events');
-
+    
     const events = eventsList.slice(0, 10).map(event => {
       const venue = event._embedded?.venues?.[0];
       const priceRange = event.priceRanges?.[0];
-
+      
       return {
         title: event.name,
         type: event.classifications?.[0]?.segment?.name || 'Event',
-        date: new Date(event.dates.start.localDate + 'T' + (event.dates.start.localTime || '00:00:00')).toLocaleString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit'
+        date: new Date(event.dates.start.localDate + 'T' + (event.dates.start.localTime || '00:00:00')).toLocaleString('en-US', { 
+          weekday: 'short', 
+          month: 'short', 
+          day: 'numeric', 
+          hour: 'numeric', 
+          minute: '2-digit' 
         }),
         venue: venue?.name || 'TBA',
         price: priceRange ? `$${priceRange.min}-${priceRange.max}` : 'See website',
@@ -1455,7 +936,7 @@ async function findPlaces(cityOrCoords, type = 'tourist attraction') {
 
   // Use Azure Maps Search API (free tier) - more reliable than Nominatim
   const AZURE_MAPS_KEY = process.env.AZURE_MAPS_KEY || 'demo'; // User can add their key later
-
+  
   if (typeof cityOrCoords === 'object' && cityOrCoords.lat && cityOrCoords.lon) {
     try {
       const coordsPlaces = await findPlacesAroundCoords(cityOrCoords.lat, cityOrCoords.lon, 1200, type);
@@ -1470,16 +951,16 @@ async function findPlaces(cityOrCoords, type = 'tourist attraction') {
   }
 
   const cityName = typeof cityOrCoords === 'string' ? cityOrCoords : String(cityOrCoords || '');
-
+  
   // Check if we have coordinates for this city (cached or known)
   const cityKey = cityName.toLowerCase();
   let knownCity = CITY_COORDS[cityKey];
-
+  
   // If not in cache, try to geocode it dynamically
   if (!knownCity) {
     knownCity = await geocodeCity(cityName);
   }
-
+  
   if (knownCity) {
     console.log(`Using coordinates for ${cityName}: ${knownCity.lat}, ${knownCity.lon}`);
     try {
@@ -1492,7 +973,7 @@ async function findPlaces(cityOrCoords, type = 'tourist attraction') {
       console.error('Error searching by coordinates:', err.message || err);
     }
   }
-
+  
   // If geocoding failed or no results, use fallback
   console.log(`No results found for ${cityName}, using fallback places.`);
   return { live: false, places: FALLBACK_PLACES };
@@ -1508,18 +989,18 @@ function filterPlacesByType(places, type) {
     const isFood = /(food|restaurant|restaurants|cafe|cafes|eat|eatery)/.test(t);
     const isShop = /(shopping|shop|shops|mall|market)/.test(t);
     const isAttraction = /(attraction|museum|museums|park|parks|theatre|theater|cinema)/.test(t) || (!isFood && !isShop);
-    const FOOD = new Set(['restaurant', 'cafe', 'fast_food', 'food_court', 'ice_cream', 'bar', 'pub']);
-    const SHOP = new Set(['mall', 'department_store', 'supermarket', 'convenience', 'clothes', 'electronics', 'bakery', 'butcher', 'books', 'furniture', 'shoe', 'jewelry', 'gift', 'toy', 'cosmetics', 'marketplace']);
-    const ATR = new Set(['museum', 'attraction', 'gallery', 'artwork', 'zoo', 'theatre', 'cinema', 'park', 'garden']);
+    const FOOD = new Set(['restaurant','cafe','fast_food','food_court','ice_cream','bar','pub']);
+    const SHOP = new Set(['mall','department_store','supermarket','convenience','clothes','electronics','bakery','butcher','books','furniture','shoe','jewelry','gift','toy','cosmetics','marketplace']);
+    const ATR = new Set(['museum','attraction','gallery','artwork','zoo','theatre','cinema','park','garden']);
     const ok = (val) => {
-      const v = String(val || '').toLowerCase();
+      const v = String(val||'').toLowerCase();
       if (isFood) return FOOD.has(v);
-      if (isShop) return SHOP.has(v) || v === 'shop';
+      if (isShop) return SHOP.has(v) || v==='shop';
       if (isAttraction) return ATR.has(v);
       return true;
     };
     const out = places.filter(p => ok(p.type));
-    return out.length > 0 ? out : places;
+    return out.length>0 ? out : places;
   } catch { return places || []; }
 }
 // TOOL EXECUTION HANDLERS
@@ -1528,19 +1009,19 @@ function filterPlacesByType(places, type) {
 async function executeToolCall(toolCall) {
   const functionName = toolCall.function.name;
   const args = JSON.parse(toolCall.function.arguments || '{}');
-
+  
   console.log(`?? Executing tool: ${functionName}`, args);
 
   switch (functionName) {
     case 'searchNearbyAttractions': {
       let location = args.location;
       const type = args.type || 'tourist attraction';
-
+      
       // Use browser coordinates if available and location is BROWSER_COORDS
       if (location === 'BROWSER_COORDS' && global.browserCoords) {
         location = { lat: parseFloat(global.browserCoords.lat), lon: parseFloat(global.browserCoords.lon) };
       }
-
+      
       // Track location search (use friendly name for coordinates)
       let locationStr;
       if (typeof location === 'object') {
@@ -1552,21 +1033,21 @@ async function executeToolCall(toolCall) {
         locationStr = location;
       }
       trackLocationSearch(locationStr);
-
+      
       const result = await findPlaces(location, type);
       const filteredPlaces = filterPlacesByType(result.places, type);
-
+      
       // Track failed query if no results
       if (filteredPlaces.length === 0) {
         const sessionId = global.currentSessionId || 'unknown';
         trackFailedQuery(sessionId, `${type} near ${locationStr}`, 'no_results');
       }
-
+      
       return {
         success: true,
         live: result.live,
         places: filteredPlaces,
-        message: result.live
+        message: result.live 
           ? `Found ${filteredPlaces.length} ${type}(s) near ${typeof location === 'object' ? 'your location' : location}`
           : `Using fallback suggestions (live data unavailable)`
       };
@@ -1574,12 +1055,12 @@ async function executeToolCall(toolCall) {
 
     case 'searchFoodPlaces': {
       let location = args.location;
-
+      
       // Use browser coordinates if available and location is BROWSER_COORDS
       if (location === 'BROWSER_COORDS' && global.browserCoords) {
         location = { lat: parseFloat(global.browserCoords.lat), lon: parseFloat(global.browserCoords.lon) };
       }
-
+      
       const result = await findPlaces(location, 'restaurant');
       const filteredPlaces = filterPlacesByType(result.places, 'restaurant');
       return {
@@ -1594,12 +1075,12 @@ async function executeToolCall(toolCall) {
 
     case 'searchAttractionPlaces': {
       let location = args.location;
-
+      
       // Use browser coordinates if available and location is BROWSER_COORDS
       if (location === 'BROWSER_COORDS' && global.browserCoords) {
         location = { lat: parseFloat(global.browserCoords.lat), lon: parseFloat(global.browserCoords.lon) };
       }
-
+      
       const result = await findPlaces(location, 'tourist attraction');
       const filteredPlaces = filterPlacesByType(result.places, 'tourist attraction');
       return {
@@ -1614,12 +1095,12 @@ async function executeToolCall(toolCall) {
 
     case 'searchShoppingPlaces': {
       let location = args.location;
-
+      
       // Use browser coordinates if available and location is BROWSER_COORDS
       if (location === 'BROWSER_COORDS' && global.browserCoords) {
         location = { lat: parseFloat(global.browserCoords.lat), lon: parseFloat(global.browserCoords.lon) };
       }
-
+      
       const result = await findPlaces(location, 'shopping');
       const filteredPlaces = filterPlacesByType(result.places, 'shopping');
       return {
@@ -1633,69 +1114,10 @@ async function executeToolCall(toolCall) {
     }
 
     case 'getHotelInfo': {
-      // CASCADE STRATEGY: RAG -> LLM Fallback -> QnA Fallback
-
-      // STEP 1: Try RAG first (semantic search on knowledge base)
-      if (ragInitialized) {
-        const ragResult = await answerWithRAG(args.query);
-        if (ragResult) {
-          console.log(`✅ Answered using RAG with ${ragResult.sources.length} sources`);
-
-          // Track RAG performance
-          const avgConfidence = ragResult.sources.reduce((sum, s) => sum + parseFloat(s.similarity), 0) / ragResult.sources.length;
-          trackRAGPerformance(args.query, avgConfidence, ragResult.sources.length, true);
-          trackDeflection(true); // RAG answered = deflected from staff
-          trackResponseTime(Date.now() - (global.requestStartTime || Date.now()), true, true);
-
-          return {
-            success: true,
-            answer: ragResult.answer,
-            sources: ragResult.sources,
-            method: 'RAG',
-            query: args.query
-          };
-        } else {
-          console.log(`⚠️  RAG found no matches for: "${args.query}"`);
-          // RAG couldn't find answer - track knowledge gap for later analysis
-          trackKnowledgeGap(args.query);
-        }
-      }
-
-      // STEP 2: Try LLM fallback (Azure OpenAI) if RAG has no matches
-      const llmResult = await answerWithLLMFallback(args.query, 'Guest is staying at a hotel and asking about hotel services/policies.');
-      if (llmResult) {
-        console.log(`🤖 Answered using LLM fallback`);
-
-        trackRAGPerformance(args.query, llmResult.confidence || 0.5, 0, true); // Track as lower confidence
-        trackDeflection(true); // LLM answered = deflected from staff
-        trackResponseTime(Date.now() - (global.requestStartTime || Date.now()), false, true);
-
-        return {
-          success: true,
-          answer: llmResult.answer,
-          sources: llmResult.sources,
-          method: 'LLM_FALLBACK',
-          query: args.query,
-          note: '(Generated via AI - use front desk for critical policies)'
-        };
-      }
-
-      // STEP 3: Fallback to keyword-based QnA
       const answer = answerFromQnA(args.query);
-
-      if (answer) {
-        console.log(`📋 Answered using keyword QnA`);
-        trackDeflection(true); // QnA answered = deflected
-        trackResponseTime(Date.now() - (global.requestStartTime || Date.now()), false, true);
-      } else {
-        console.log(`❌ No answer found in any method for: "${args.query}"`);
-        trackKnowledgeGap(args.query);
-      }
-
       return {
         success: true,
-        answer: answer || 'I don\'t have that specific information. Please contact hotel staff for accurate details.',
-        method: answer ? 'QnA' : 'NONE',
+        answer: answer || 'I don\'t have that specific information. Please contact hotel staff.',
         query: args.query
       };
     }
@@ -1735,25 +1157,6 @@ async function executeToolCall(toolCall) {
           console.log(`? Ticket ${ticketId} saved to in-memory storage`);
         }
 
-        // Also try to persist via Mongoose Ticket model (if available).
-        // This ensures tickets created via the agent also appear in the Mongo/Cosmos (Mongo API) collection
-        try {
-          if (TicketModel) {
-            const mongoDoc = await TicketModel.create({
-              guestName: ticket.guestName,
-              roomNumber: ticket.roomNumber,
-              requestType: ticket.requestType,
-              priority: ticket.priority,
-              description: ticket.description,
-              status: ticket.status,
-              meta: { createdBy: 'agent', externalId: ticketId }
-            });
-            console.log(`? Ticket ${ticketId} also saved to MongoDB (Mongoose) _id=${mongoDoc._id}`);
-          }
-        } catch (mErr) {
-          console.error('Mongoose save (agent) failed:', mErr && mErr.message ? mErr.message : mErr);
-        }
-
         // Estimate response time based on request type
         const estimatedTime = {
           'Housekeeping': '15-20 minutes',
@@ -1766,12 +1169,6 @@ async function executeToolCall(toolCall) {
         // Track ticket creation in analytics
         const sessionId = global.currentSessionId || 'unknown';
         trackTicket(sessionId, ticketId, args.requestType);
-
-        // NEW: Track service request for operations dashboard
-        trackServiceRequest(ticketId, args.requestType, args.priority || 'Medium', 'open');
-        trackCommonIssue(args.requestType);
-        trackPeakDemand();
-        trackDeflection(false); // Ticket created = not deflected
 
         return {
           success: true,
@@ -1821,17 +1218,6 @@ async function executeToolCall(toolCall) {
 
         await saveGuestProfile(profile);
 
-        // NEW: Track guest preferences for personalization insights
-        if (args.interests) {
-          args.interests.forEach(interest => trackGuestPreference('interests', interest));
-        }
-        if (args.dietary) {
-          args.dietary.forEach(diet => trackGuestPreference('dietary', diet));
-        }
-        if (args.mobility) {
-          trackGuestPreference('mobility', args.mobility);
-        }
-
         return {
           success: true,
           message: 'Thanks! I\'ve saved your preferences and will tailor my suggestions to your interests.',
@@ -1853,7 +1239,7 @@ async function executeToolCall(toolCall) {
       try {
         const location = args.location || 'current';
         const weatherData = await fetchWeatherData(location);
-
+        
         if (!weatherData.success) {
           return {
             success: false,
@@ -1883,9 +1269,9 @@ async function executeToolCall(toolCall) {
         const location = args.location;
         const eventType = args.eventType || 'all';
         const timeframe = args.timeframe || 'today';
-
+        
         const eventsData = await searchEvents(location, eventType, timeframe);
-
+        
         if (!eventsData.success) {
           return {
             success: false,
@@ -1977,30 +1363,13 @@ async function handleAzureAIAgent(userMessage, conversationHistory = [], guestPr
   const messages = [
     {
       role: 'system',
-      content: `You are a warm and experienced hotel concierge AI assistant dedicated to making every guest's stay exceptional.
-
-Your personality:
-- Professional yet genuinely friendly and approachable
-- Attentive to details and anticipate guest needs
-- Patient and understanding, especially with first-time visitors
-- Enthusiastic about helping guests discover great experiences
-- Express care through your responses (e.g., "I'd be happy to help with that!", "Great choice!", "I hope you enjoy!")
-
-You help guests with:
-- Finding wonderful nearby attractions, restaurants, and places to visit
-- Answering hotel-related questions (check-in/out, amenities, WiFi, etc.) - ALWAYS use getHotelInfo tool for these
-- Providing transportation information and local insights
-- Creating service tickets for guest requests with care and urgency
-- Collecting guest preferences for thoughtful, personalized recommendations
-- General hospitality assistance with a smile
-
-IMPORTANT: For ANY question about the hotel (policies, amenities, services, facilities), you MUST call the getHotelInfo tool. Never answer hotel questions from general knowledge.
-
-Communication style:
-- Start conversations warmly and welcome guests genuinely
-- Use phrases like "I'd be delighted to help", "Wonderful!", "Let me find that for you"
-- End interactions with encouraging notes like "Enjoy your visit!", "Have a great time!", or "Please let me know if you need anything else"
-- Be conversational but maintain professionalism
+      content: `You are a helpful hotel concierge AI assistant. You help guests with:
+  - Finding nearby attractions, restaurants, and places to visit
+  - Answering hotel-related questions (check-in/out, amenities, WiFi, etc.)
+  - Providing transportation information
+  - Creating service tickets for guest requests
+  - Collecting guest preferences for personalized recommendations
+  - General hospitality assistance
 ${locationContext}${profileContext}${onboardingPrompt}
 
   CRITICAL RULES for place searches - FOLLOW EXACTLY:
@@ -2078,7 +1447,7 @@ ${locationContext}${profileContext}${onboardingPrompt}
     // Handle tool calls if the agent wants to use them
     if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
       console.log(`?? Agent requested ${assistantMessage.tool_calls.length} tool call(s)`);
-
+      
       // Execute all tool calls
       for (const toolCall of assistantMessage.tool_calls) {
         const result = await executeToolCall(toolCall);
@@ -2131,18 +1500,15 @@ ${locationContext}${profileContext}${onboardingPrompt}
 
 app.post('/api/message', async (req, res) => {
   try {
-    const { sessionId = 'anon', message = '', consentLocation = false, coords, city, conversationHistory = [], lastPlace } = req.body;
-
-    // NEW: Track request start time for response time metrics
-    global.requestStartTime = Date.now();
+    const { sessionId = 'anon', message = '', consentLocation = false, coords, city, conversationHistory = [] } = req.body;
 
     // Track the question in analytics
     trackQuestion(sessionId, message);
 
     if (activeRequests.get(sessionId)) {
-      return res.json({
-        reply: "I'm processing your previous request. Please wait a moment before sending another.",
-        queued: false
+      return res.json({ 
+        reply: "I'm processing your previous request. Please wait a moment before sending another.", 
+        queued: false 
       });
     }
     activeRequests.set(sessionId, true);
@@ -2175,11 +1541,11 @@ app.post('/api/message', async (req, res) => {
       } catch (error) {
         console.error('Azure AI Agent failed, falling back to original logic:', error.message);
         // Fall back to original logic if Azure AI fails
-        result = await handleOriginalLogic(message, consentLocation, coords, city, guestProfile, lastPlace);
+        result = await handleOriginalLogic(message, consentLocation, coords, city, guestProfile);
       }
     } else {
       console.log('?? Using original logic (Azure AI not configured)');
-      result = await handleOriginalLogic(message, consentLocation, coords, city, guestProfile, lastPlace);
+      result = await handleOriginalLogic(message, consentLocation, coords, city, guestProfile);
     }
 
     activeRequests.delete(sessionId);
@@ -2193,7 +1559,7 @@ app.post('/api/message', async (req, res) => {
 });
 
 // Original logic function (from your existing server.js)
-async function handleOriginalLogic(message, consentLocation, coords, city, guestProfile, lastPlace) {
+async function handleOriginalLogic(message, consentLocation, coords, city, guestProfile) {
   const intent = detectIntent(message);
   let reply = '';
   let suggestions = null;
@@ -2201,12 +1567,12 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
 
   // Check if this is a new guest needing onboarding
   const isNewGuest = !guestProfile || !guestProfile.onboardingComplete;
-
+  
   if (intent === 'greet' && isNewGuest) {
     // First greeting - ask about interests
     if (!guestProfile.interests || guestProfile.interests.length === 0) {
       reply = 'Welcome! To help you better, what are you most interested in during your stay? (Food & Dining, Arts & Culture, Outdoor Activities, Shopping, Nightlife, or Family Fun)';
-    }
+    } 
     // If they have interests but no dietary info
     else if (!guestProfile.dietary || guestProfile.dietary.length === 0) {
       reply = 'Great! Any dietary preferences I should know about? (Vegetarian, Vegan, Halal, Kosher, Gluten-free, or No restrictions)';
@@ -2246,25 +1612,6 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
         reply = "I couldn't find live attraction data right now. Would you like general suggestions instead?";
       }
     }
-  } else if (intent === 'place_details') {
-    // User is asking for details about a place
-    if (!lastPlace) {
-      reply = 'Which place would you like more information about? You can select one from the suggestions above or tell me the name.';
-    } else {
-      // Try to get details for the last selected place
-      const details = await getPlaceDetails(lastPlace.name, lastPlace.lat, lastPlace.lon);
-      if (details) {
-        reply = `Here's what I found about **${details.name}**:\n\n`;
-        reply += `📍 Location: ${details.address}\n`;
-        if (details.amenity) reply += `🏷️ Type: ${details.amenity}\n`;
-        if (details.hours) reply += `⏰ Hours: ${details.hours}\n`;
-        if (details.phone) reply += `📞 Phone: ${details.phone}\n`;
-        if (details.website) reply += `🌐 Website: ${details.website}\n`;
-        reply += `\nWould you like directions, recommendations, or more details?`;
-      } else {
-        reply = `I tried to get more details about ${lastPlace.name}, but I couldn't find additional information right now. Try asking "places near [city]" to see more options.`;
-      }
-    }
   } else if (intent === 'transport') {
     reply = 'Do you need a taxi, shuttle, or directions? I can provide estimated times and options.';
   } else if (intent === 'translation') {
@@ -2280,7 +1627,7 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
     // Check if message might be answering onboarding questions
     if (isNewGuest) {
       const lowerMsg = message.toLowerCase();
-
+      
       // Check if they're answering interests question
       if (!guestProfile.interests || guestProfile.interests.length === 0) {
         const interestMatches = ['food', 'dining', 'art', 'culture', 'outdoor', 'shopping', 'nightlife', 'family'];
@@ -2292,16 +1639,16 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
           if (lowerMsg.includes('shopping')) guestProfile.interests.push('Shopping');
           if (lowerMsg.includes('nightlife')) guestProfile.interests.push('Nightlife');
           if (lowerMsg.includes('family')) guestProfile.interests.push('Family Fun');
-
+          
           await saveGuestProfile(guestProfile);
           reply = 'Great! Any dietary preferences I should know about? (Vegetarian, Vegan, Halal, Kosher, Gluten-free, or No restrictions)';
           return { intent: 'onboarding', reply, suggestions, liveLookup };
         }
       }
-
+      
       // Check if they're answering dietary question
-      if (guestProfile.interests && guestProfile.interests.length > 0 &&
-        (!guestProfile.dietary || guestProfile.dietary.length === 0)) {
+      if (guestProfile.interests && guestProfile.interests.length > 0 && 
+          (!guestProfile.dietary || guestProfile.dietary.length === 0)) {
         const dietaryMatches = ['vegetarian', 'vegan', 'halal', 'kosher', 'gluten', 'no restriction', 'none', 'no'];
         if (dietaryMatches.some(keyword => lowerMsg.includes(keyword))) {
           // Save dietary preference
@@ -2313,7 +1660,7 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
           if (lowerMsg.includes('no restriction') || lowerMsg.includes('none') || lowerMsg === 'no') {
             guestProfile.dietary.push('No restrictions');
           }
-
+          
           guestProfile.onboardingComplete = true;
           await saveGuestProfile(guestProfile);
           reply = 'Perfect! I\'ve saved your preferences. How can I help you today?';
@@ -2321,7 +1668,7 @@ async function handleOriginalLogic(message, consentLocation, coords, city, guest
         }
       }
     }
-
+    
     const qnaAns = answerFromQnA(message);
     reply = qnaAns || "I'm not sure I understood. Could you please rephrase or tell me one detail (e.g., city or room number)?";
   }
@@ -2339,177 +1686,15 @@ function detectIntent(text) {
   if (t.includes('translate') || t.startsWith('translate') || t.includes('in spanish') || t.includes('to spanish')) return 'translation';
   if (t.includes('near') || t.includes('nearby') || t.includes('attraction') || t.includes('things to do') || t.includes('restaurants near')) return 'local_attractions';
   if (t.includes('thanks') || t.includes('thank you') || t.includes('bye') || t.includes('goodbye')) return 'small_talk';
-  if (t.includes('detail') || t.includes('more info') || t.includes('more information') || t.includes('tell me about') || t.includes('what is') || t.includes('info about')) return 'place_details';
   return 'unknown';
-}
-
-// Fetch detailed information about a place from Nominatim
-async function getPlaceDetails(placeName, lat, lon) {
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse.php?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-
-    const res = await fetchWithRetry(url, {
-      timeoutMs: 4000,
-      headers: { 'User-Agent': 'ai-concierge-mvp/0.1 (mailto:you@example.com)' }
-    }, 2, 700);
-
-    const data = await res.json();
-
-    if (!data || !data.address) {
-      return null;
-    }
-
-    // Build a human-readable summary from reverse geocoding data
-    const address = data.address;
-    const type = data.type || 'location';
-    const displayName = data.display_name || placeName;
-
-    // Extract relevant address components
-    let details = {
-      name: placeName || data.name || 'Unknown Place',
-      type: type,
-      address: displayName,
-      amenity: address.amenity || address.tourist_attraction || address.leisure || '',
-      city: address.city || address.town || address.village || '',
-      state: address.state || '',
-      country: address.country || '',
-      website: data.extratags && data.extratags.website ? data.extratags.website : '',
-      phone: data.extratags && data.extratags.phone ? data.extratags.phone : '',
-      hours: data.extratags && data.extratags.opening_hours ? data.extratags.opening_hours : ''
-    };
-
-    return details;
-  } catch (err) {
-    console.error('Error fetching place details:', err && err.message ? err.message : err);
-    return null;
-  }
 }
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', azureAI: !!azureOpenAIClient }));
 
-// Mount Express tickets router (Mongoose-backed) if available
-try {
-  const ticketsRouter = require('./routes/tickets');
-  if (ticketsRouter) {
-    app.use('/api/tickets', ticketsRouter);
-    console.log('✓ Mongoose tickets router mounted at /api/tickets');
-  }
-} catch (e) {
-  // Router not present or failed to load; continue without it
-  console.warn('Tickets router not mounted (./routes/tickets not found or failed to load)');
-}
-
 // Analytics API endpoint
-app.get('/api/analytics', async (req, res) => {
+app.get('/api/analytics', (req, res) => {
   try {
-    // Calculate actionable insights
-    const totalSatisfaction = analytics.guestSatisfaction.length;
-    const avgSatisfaction = totalSatisfaction > 0
-      ? analytics.guestSatisfaction.reduce((sum, s) => sum + s.rating, 0) / totalSatisfaction
-      : 0;
-
-    const totalRequests = analytics.serviceRequests.length;
-    const resolvedRequests = analytics.serviceRequests.filter(r => r.status === 'resolved');
-    const avgResolutionTime = resolvedRequests.length > 0
-      ? resolvedRequests.reduce((sum, r) => sum + (r.resolutionTime || 0), 0) / resolvedRequests.length
-      : 0;
-
-    const totalRAG = analytics.ragPerformance.length;
-    const accurateRAG = analytics.ragPerformance.filter(r => r.wasAccurate).length;
-    const ragAccuracy = totalRAG > 0 ? (accurateRAG / totalRAG) * 100 : 0;
-
-    const totalInteractions = analytics.deflectionRate.successfulSelfService + analytics.deflectionRate.requiredStaff;
-    const deflectionPercentage = totalInteractions > 0
-      ? (analytics.deflectionRate.successfulSelfService / totalInteractions) * 100
-      : 0;
-
-    const avgResponseTime = analytics.responseTimeTracking.length > 0
-      ? analytics.responseTimeTracking.reduce((sum, r) => sum + r.responseTimeMs, 0) / analytics.responseTimeTracking.length
-      : 0;
-
-    // Peak hours analysis
-    const peakHours = Object.entries(analytics.peakDemandTimes)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([hour, count]) => ({ hour: parseInt(hour), requests: count }));
-
-    // Top issues
-    const topIssues = Object.entries(analytics.commonIssues)
-      .map(([category, data]) => ({
-        category,
-        count: data.count,
-        avgResolutionTime: data.count > 0 ? data.totalResolutionTime / data.count : 0
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-
-    // Upsell conversion rate
-    const totalUpsells = analytics.upsellOpportunities.length;
-    const convertedUpsells = analytics.upsellOpportunities.filter(u => u.wasConverted).length;
-    const upsellConversion = totalUpsells > 0 ? (convertedUpsells / totalUpsells) * 100 : 0;
-
-    // Guest preferences summary
-    const preferencesSummary = {};
-    for (const [category, values] of Object.entries(analytics.guestPreferences)) {
-      preferencesSummary[category] = Object.entries(values)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([value, count]) => ({ value, count }));
-    }
-
-    // Response to all analytics requests with actionable insights
-    res.json({
-      // GUEST EXPERIENCE METRICS
-      guestExperience: {
-        satisfactionScore: parseFloat(avgSatisfaction.toFixed(2)),
-        totalRatings: totalSatisfaction,
-        recentFeedback: analytics.guestSatisfaction.slice(-10)
-      },
-
-      // OPERATIONAL EFFICIENCY
-      operations: {
-        totalRequests: totalRequests,
-        resolvedRequests: resolvedRequests.length,
-        avgResolutionTimeMinutes: parseFloat((avgResolutionTime / 60000).toFixed(2)),
-        pendingRequests: analytics.serviceRequests.filter(r => r.status === 'open').length,
-        peakDemandHours: peakHours
-      },
-
-      // AI PERFORMANCE
-      aiPerformance: {
-        ragAccuracy: parseFloat(ragAccuracy.toFixed(2)),
-        totalQueries: totalRAG,
-        avgResponseTimeMs: parseFloat(avgResponseTime.toFixed(2)),
-        deflectionRate: parseFloat(deflectionPercentage.toFixed(2)),
-        knowledgeGaps: analytics.knowledgeGaps.slice(-20)
-      },
-
-      // REVENUE OPPORTUNITIES
-      revenue: {
-        upsellConversionRate: parseFloat(upsellConversion.toFixed(2)),
-        totalOpportunities: totalUpsells,
-        converted: convertedUpsells,
-        recentOpportunities: analytics.upsellOpportunities.slice(-10)
-      },
-
-      // PROCESS IMPROVEMENT
-      insights: {
-        topIssues: topIssues,
-        guestPreferences: preferencesSummary,
-        costSavings: {
-          deflectedInteractions: analytics.deflectionRate.successfulSelfService,
-          estimatedSavings: analytics.deflectionRate.successfulSelfService * 5 // $5 per deflected interaction
-        }
-      },
-
-      // RAW DATA (for detailed analysis)
-      raw: {
-        serviceRequests: analytics.serviceRequests,
-        openTickets: analytics.serviceRequests.filter(r => r.status === 'open' || r.status === 'in_progress'),
-        ragPerformance: analytics.ragPerformance.slice(-100),
-        responseTracking: analytics.responseTimeTracking.slice(-100)
-      }
-    });
+    res.json(analytics);
   } catch (error) {
     console.error('Analytics API error:', error);
     res.status(500).json({ error: 'Failed to retrieve analytics' });
@@ -2521,126 +1706,9 @@ app.get('/analytics', (req, res) => {
   res.sendFile(path.join(__dirname, 'analytics-dashboard.html'));
 });
 
-// ============================================
-// RATING/FEEDBACK ENDPOINT
-// ============================================
-
-// API endpoint for rating bot responses (thumbs up/down)
-app.post('/api/rate-response', async (req, res) => {
-  try {
-    const { sessionId, messageId, rating, timestamp } = req.body;
-
-    if (!sessionId || !messageId || !rating) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Convert rating to 1-5 scale (positive = 5, negative = 1)
-    const numericRating = rating === 'positive' ? 5 : 1;
-    const feedback = rating === 'positive' ? 'Thumbs Up' : 'Thumbs Down';
-
-    // Track guest satisfaction
-    await trackGuestSatisfaction(sessionId, numericRating, feedback, 'bot_response');
-
-    console.log(`📊 Guest rating recorded: ${rating} (${numericRating}/5) for message ${messageId}`);
-
-    return res.json({
-      success: true,
-      message: 'Rating recorded successfully',
-      rating: numericRating
-    });
-  } catch (error) {
-    console.error('Error recording rating:', error);
-    return res.status(500).json({ error: 'Failed to record rating' });
-  }
-});
-
-// ============================================
-// AUTHENTICATION ENDPOINTS
-// ============================================
-
-app.post('/api/login', (req, res) => {
-  try {
-    const { persona, roomNumber, guestName, staffId, password } = req.body;
-
-    if (!persona) {
-      return res.status(400).json({ error: 'Persona (guest/staff) is required' });
-    }
-
-    if (persona === 'guest') {
-      // Guest login
-      if (!roomNumber || !guestName) {
-        return res.status(400).json({ error: 'Room number and name are required' });
-      }
-
-      const result = auth.createGuestSession(roomNumber, guestName);
-      return res.json(result);
-    } else if (persona === 'staff') {
-      // Staff login
-      if (!staffId || !password) {
-        return res.status(400).json({ error: 'Employee ID and password are required' });
-      }
-
-      const verification = auth.verifyStaffCredentials(staffId, password);
-      if (!verification.valid) {
-        return res.status(401).json({ error: verification.error || 'Invalid credentials' });
-      }
-
-      const result = auth.createStaffSession(staffId);
-      return res.json(result);
-    } else {
-      return res.status(400).json({ error: 'Invalid persona' });
-    }
-  } catch (err) {
-    console.error('Login error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/logout', (req, res) => {
-  try {
-    const { sessionToken } = req.body;
-    if (sessionToken) {
-      auth.destroySession(sessionToken);
-    }
-    return res.json({ success: true, message: 'Logged out successfully' });
-  } catch (err) {
-    console.error('Logout error:', err);
-    return res.status(500).json({ error: 'Logout failed' });
-  }
-});
-
-app.post('/api/verify-session', (req, res) => {
-  try {
-    const { sessionToken } = req.body;
-    if (!sessionToken) {
-      return res.status(401).json({ valid: false, error: 'No session token provided' });
-    }
-
-    const session = auth.verifySession(sessionToken);
-    if (!session) {
-      return res.status(401).json({ valid: false, error: 'Invalid or expired session' });
-    }
-
-    return res.json({ valid: true, session });
-  } catch (err) {
-    console.error('Session verification error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`?? AI Concierge with Azure AI listening on http://localhost:${PORT}`);
   console.log(`   Azure AI Agent: ${USE_AZURE_AI ? '? Enabled' : '? Disabled'}`);
   console.log(`   Analytics Dashboard: http://localhost:${PORT}/analytics`);
-
-  // Initialize RAG system after server starts
-  if (USE_AZURE_AI && azureOpenAIClient && hotelKnowledge.length > 0) {
-    console.log('\n?? Initializing RAG system...');
-    await initializeRAG();
-  } else {
-    console.log('\n\u26a0\ufe0f  RAG system disabled (requires Azure OpenAI and hotel_knowledge.json)');
-  }
-
-  console.log('\n??? Server ready! Try asking hotel questions to test RAG semantic search.\n');
 });
 

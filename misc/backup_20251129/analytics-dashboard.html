@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,7 +28,7 @@
             padding: 30px;
             border-radius: 15px;
             margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
 
         .header h1 {
@@ -54,7 +53,7 @@
             background: white;
             padding: 25px;
             border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             transition: transform 0.3s ease;
         }
 
@@ -105,7 +104,7 @@
             background: white;
             padding: 30px;
             border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             margin-bottom: 30px;
         }
 
@@ -159,7 +158,7 @@
             background: white;
             padding: 30px;
             border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             margin-bottom: 30px;
         }
 
@@ -245,7 +244,6 @@
         }
     </style>
 </head>
-
 <body>
     <div class="dashboard">
         <div class="header">
@@ -311,8 +309,6 @@
             </div>
         </div>
 
-
-
         <!-- Top Service Issues -->
         <div class="list-container">
             <h2>🔧 Most Common Service Requests</h2>
@@ -367,19 +363,19 @@
             try {
                 const response = await fetch('/api/analytics');
                 const data = await response.json();
-
+                
                 // Update KPI Cards
-                document.getElementById('satisfaction-score').textContent =
+                document.getElementById('satisfaction-score').textContent = 
                     data.guestExperience.satisfactionScore.toFixed(1) || '0.0';
-                document.getElementById('deflection-rate').textContent =
+                document.getElementById('deflection-rate').textContent = 
                     data.aiPerformance.deflectionRate.toFixed(0) + '%';
-                document.getElementById('rag-accuracy').textContent =
+                document.getElementById('rag-accuracy').textContent = 
                     data.aiPerformance.ragAccuracy.toFixed(0) + '%';
-                document.getElementById('response-time').textContent =
+                document.getElementById('response-time').textContent = 
                     data.aiPerformance.avgResponseTimeMs.toFixed(0);
-                document.getElementById('cost-savings').textContent =
+                document.getElementById('cost-savings').textContent = 
                     '$' + data.insights.costSavings.estimatedSavings.toFixed(0);
-                document.getElementById('upsell-rate').textContent =
+                document.getElementById('upsell-rate').textContent = 
                     data.revenue.upsellConversionRate.toFixed(0) + '%';
 
                 // Update trends
@@ -393,8 +389,6 @@
                 // Render Peak Demand Chart
                 renderPeakDemandChart(data.operations.peakDemandHours);
 
-
-
                 // Render Top Issues
                 renderTopIssues(data.insights.topIssues);
 
@@ -404,27 +398,27 @@
                 // Render Guest Preferences
                 renderPreferences(data.insights.guestPreferences);
 
-                // Render Service Requests
-                renderServiceRequests(data.raw.serviceRequests);
+                                // Render Service Requests
+                                renderServiceRequests(data.raw.serviceRequests);
 
-                // Render Open Tickets for staff
-                if (data.raw.openTickets && Array.isArray(data.raw.openTickets)) {
-                    renderOpenTickets(data.raw.openTickets);
-                }
-                // Render open tickets for staff
-                function renderOpenTickets(tickets) {
-                    const container = document.getElementById('open-tickets-list');
-                    if (!container) return;
-                    if (!tickets || tickets.length === 0) {
-                        container.innerHTML = '<div class="empty-state"><p>No open tickets.</p></div>';
-                        return;
-                    }
-                    container.innerHTML = tickets.map(ticket => {
-                        const statusBadge = ticket.status === 'resolved' ? 'badge-success' :
-                            ticket.status === 'open' ? 'badge-warning' : 'badge-info';
-                        const priorityBadge = ticket.priority === 'High' || ticket.priority === 'Urgent' ?
-                            'badge-danger' : 'badge-info';
-                        return `
+                                // Render Open Tickets for staff
+                                if (data.raw.openTickets && Array.isArray(data.raw.openTickets)) {
+                                    renderOpenTickets(data.raw.openTickets);
+                                }
+        // Render open tickets for staff
+        function renderOpenTickets(tickets) {
+            const container = document.getElementById('open-tickets-list');
+            if (!container) return;
+            if (!tickets || tickets.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No open tickets.</p></div>';
+                return;
+            }
+            container.innerHTML = tickets.map(ticket => {
+                const statusBadge = ticket.status === 'resolved' ? 'badge-success' : 
+                                   ticket.status === 'open' ? 'badge-warning' : 'badge-info';
+                const priorityBadge = ticket.priority === 'High' || ticket.priority === 'Urgent' ? 
+                                     'badge-danger' : 'badge-info';
+                return `
                     <div class="list-item">
                         <div>
                             <div class="list-item-title">${ticket.requestType} - ${ticket._id || ticket.ticketId}</div>
@@ -442,8 +436,8 @@
                         </div>
                     </div>
                 `;
-                    }).join('');
-                }
+            }).join('');
+        }
 
             } catch (error) {
                 console.error('Failed to load analytics:', error);
@@ -485,10 +479,6 @@
             return `${displayHour}${period}`;
         }
 
-
-
-
-
         function renderTopIssues(issues) {
             const container = document.getElementById('top-issues-list');
             if (!issues || issues.length === 0) {
@@ -501,9 +491,9 @@
                     <div>
                         <div class="list-item-title">${issue.category}</div>
                         <span class="badge badge-info">${issue.count} requests</span>
-                        ${issue.avgResolutionTime > 0 ?
-                    `<span class="badge badge-warning">${(issue.avgResolutionTime / 60000).toFixed(0)} min avg</span>`
-                    : ''}
+                        ${issue.avgResolutionTime > 0 ? 
+                            `<span class="badge badge-warning">${(issue.avgResolutionTime / 60000).toFixed(0)} min avg</span>` 
+                            : ''}
                     </div>
                     <div class="list-item-value">${issue.count}</div>
                 </div>
@@ -560,11 +550,11 @@
 
             const recentRequests = requests.slice(-10).reverse();
             container.innerHTML = recentRequests.map(request => {
-                const statusBadge = request.status === 'resolved' ? 'badge-success' :
-                    request.status === 'open' ? 'badge-warning' : 'badge-info';
-                const priorityBadge = request.priority === 'High' || request.priority === 'Urgent' ?
-                    'badge-danger' : 'badge-info';
-
+                const statusBadge = request.status === 'resolved' ? 'badge-success' : 
+                                   request.status === 'open' ? 'badge-warning' : 'badge-info';
+                const priorityBadge = request.priority === 'High' || request.priority === 'Urgent' ? 
+                                     'badge-danger' : 'badge-info';
+                
                 return `
                     <div class="list-item">
                         <div>
@@ -593,5 +583,4 @@
         setInterval(loadAnalytics, 30000);
     </script>
 </body>
-
 </html>
