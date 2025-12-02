@@ -1,0 +1,17 @@
+AZURE_OPENAI_ENDPOINT=https://openaiinstanceshir.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
+AZURE_OPENAI_API_VERSION=2024-08-01-preview
+AZURE_OPENAI_API_KEY=9AKFtIM28SIONdcao6Jadl6WlAuvszqsqleUGPqacs7r3WrFAB71JQQJ99BKACHYHv6XJ3w3AAABACOGTRxS
+PORT=3000
+
+# Weather API (OpenWeatherMap - get free key at https://openweathermap.org/api)
+OPENWEATHER_API_KEY=3d56a2e24b59a5943d873c1b57a9c86c
+
+# Events API (Ticketmaster - get free key at https://developer.ticketmaster.com/)
+TICKETMASTER_API_KEY=vSgAz7qbXOmPh6GzZ3OkR2YnZFvqZErl
+
+MONGO_URI="mongodb+srv://OpenArmsAdmin:IMT598C-owner@openarmsai.global.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
+
+# Azure Cognitive Services (Text Analytics)
+AZURE_COGNITIVE_KEY=1GPqD5tsATJyfzwpDmdpqWkhQhCMVZKN8Tj1U91DqrhuLIKpoGLVJQQJ99BKACHYHv6XJ3w3AAAEACOGbHyq
+AZURE_COGNITIVE_ENDPOINT=https://azureaishir.cognitiveservices.azure.com/
