@@ -2674,6 +2674,54 @@ app.post('/api/verify-session', (req, res) => {
   }
 });
 
+// ============================================
+// GUEST TICKETS ENDPOINT
+// ============================================
+
+app.get('/api/my-tickets', (req, res) => {
+  try {
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'No session token provided' });
+    }
+
+    const sessionInfo = auth.getSessionInfo(sessionToken);
+    if (!sessionInfo || sessionInfo.persona !== 'guest') {
+      return res.status(401).json({ error: 'Invalid session or not a guest' });
+    }
+
+    // Get guest's room number from session
+    const roomNumber = sessionInfo.roomNumber;
+    const guestName = sessionInfo.guestName;
+
+    // Filter tickets for this specific guest
+    const guestTickets = analytics.serviceRequests.filter(ticket => {
+      const isOpenOrInProgress = ticket.status === 'open' || ticket.status === 'Open' || ticket.status === 'in_progress';
+      const matchesRoom = ticket.roomNumber === roomNumber;
+      const matchesName = ticket.guestName === guestName;
+      
+      return isOpenOrInProgress && (matchesRoom || matchesName);
+    });
+
+    // Sort by creation date (newest first)
+    const sortedTickets = guestTickets.sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.timestamp);
+      const dateB = new Date(b.createdAt || b.timestamp);
+      return dateB - dateA;
+    });
+
+    return res.json({
+      success: true,
+      tickets: sortedTickets,
+      count: sortedTickets.length
+    });
+  } catch (err) {
+    console.error('Error fetching guest tickets:', err);
+    return res.status(500).json({ error: 'Failed to fetch tickets' });
+  }
+});
+
 app.listen(PORT, async () => {
   console.log(`?? AI Concierge with Azure AI listening on http://localhost:${PORT}`);
   console.log(`   Azure AI Agent: ${USE_AZURE_AI ? '? Enabled' : '? Disabled'}`);

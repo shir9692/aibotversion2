@@ -1,5 +1,6 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7,15 +8,19 @@
   <meta http-equiv="Expires" content="0">
   <title>AI Concierge Chat with Analytics</title>
   <style>
-    * { box-sizing: border-box; }
-    body { 
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0; 
-      padding: 0; 
-      display:flex; 
-      height:100vh; 
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
+
     .container {
       display: flex;
       width: 100%;
@@ -24,31 +29,35 @@
       gap: 15px;
       padding: 0 15px;
     }
-    #chat { 
+
+    #chat {
       flex: 1;
       min-width: 500px;
       max-width: 700px;
-      border:1px solid #ddd; 
-      display:flex; 
-      flex-direction:column; 
-      background:#fff; 
-      box-shadow:0 4px 12px rgba(0,0,0,0.2);
+      border: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       border-radius: 12px;
       overflow: hidden;
     }
+
     #analytics-panel {
       width: 420px;
       background: white;
       border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       display: flex;
       flex-direction: column;
       overflow: hidden;
       transition: all 0.3s ease;
     }
+
     #analytics-panel.collapsed {
       width: 50px;
     }
+
     .analytics-header {
       padding: 15px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -59,17 +68,20 @@
       cursor: pointer;
       user-select: none;
     }
+
     .analytics-header h3 {
       margin: 0;
       font-size: 16px;
       white-space: nowrap;
     }
+
     #analytics-panel.collapsed .analytics-header h3 {
       writing-mode: vertical-rl;
       transform: rotate(180deg);
     }
+
     .toggle-btn {
-      background: rgba(255,255,255,0.2);
+      background: rgba(255, 255, 255, 0.2);
       border: none;
       color: white;
       width: 24px;
@@ -81,20 +93,24 @@
       justify-content: center;
       font-size: 14px;
     }
+
     .analytics-content {
       flex: 1;
       overflow-y: auto;
       padding: 15px;
     }
+
     #analytics-panel.collapsed .analytics-content {
       display: none;
     }
+
     .quick-actions {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
       margin-bottom: 20px;
     }
+
     .action-btn {
       background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
       border: 1px solid #e0e4ff;
@@ -110,6 +126,7 @@
       font-weight: 600;
       color: #667eea;
     }
+
     .action-btn:hover {
       border-color: #667eea;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -117,16 +134,20 @@
       transform: scale(1.05);
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
+
     .action-btn:active {
       transform: scale(0.98);
     }
+
     .action-icon {
       font-size: 20px;
     }
+
     .action-text {
       font-size: 9px;
       line-height: 1.2;
     }
+
     .stat-mini {
       background: #f8f9fa;
       border-left: 3px solid #667eea;
@@ -134,6 +155,7 @@
       margin-bottom: 10px;
       border-radius: 4px;
     }
+
     .stat-mini-label {
       font-size: 11px;
       color: #666;
@@ -141,14 +163,17 @@
       letter-spacing: 0.5px;
       margin-bottom: 4px;
     }
+
     .stat-mini-value {
       font-size: 24px;
       font-weight: bold;
       color: #667eea;
     }
+
     .mini-list {
       margin-top: 15px;
     }
+
     .mini-list-title {
       font-size: 13px;
       font-weight: 600;
@@ -157,6 +182,7 @@
       padding-bottom: 5px;
       border-bottom: 2px solid #f0f0f0;
     }
+
     .mini-list-item {
       font-size: 12px;
       padding: 6px 0;
@@ -164,9 +190,11 @@
       display: flex;
       justify-content: space-between;
     }
+
     .mini-list-item:last-child {
       border-bottom: none;
     }
+
     .schedule-item {
       display: flex;
       justify-content: space-between;
@@ -175,121 +203,231 @@
       border-bottom: 1px solid #f5f5f5;
       font-size: 12px;
     }
+
     .schedule-item:last-child {
       border-bottom: none;
     }
+
     .schedule-label {
       color: #333;
       font-weight: 500;
     }
+
     .schedule-time {
       color: #667eea;
       font-weight: 600;
       font-size: 11px;
     }
+
     .mini-count {
       color: #667eea;
       font-weight: 600;
     }
-    #history { 
-      flex:1; 
-      padding:12px; 
-      overflow:auto; 
-      background:#fafafa; 
+
+    .ticket-item {
+      background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
+      border: 1px solid #e0e4ff;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      transition: all 0.2s ease;
     }
-    .msg { margin:8px 0; }
-    .user { text-align:right; color:#003366; font-weight: 500; }
-    .bot { text-align:left; color:#004400; }
-    #controls { 
-      display:flex; 
-      padding:12px; 
-      border-top:1px solid #eee; 
-      align-items:center; 
-      gap:8px; 
+
+    .ticket-item:hover {
+      transform: translateX(3px);
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    }
+
+    .ticket-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .ticket-type {
+      font-weight: 600;
+      color: #667eea;
+      font-size: 13px;
+    }
+
+    .ticket-status {
+      background: #fff3cd;
+      color: #856404;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .ticket-description {
+      color: #666;
+      font-size: 11px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .ticket-time {
+      color: #999;
+      font-size: 10px;
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    .ticket-id {
+      color: #999;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+
+    #history {
+      flex: 1;
+      padding: 12px;
+      overflow: auto;
+      background: #fafafa;
+    }
+
+    .msg {
+      margin: 8px 0;
+    }
+
+    .user {
+      text-align: right;
+      color: #003366;
+      font-weight: 500;
+    }
+
+    .bot {
+      text-align: left;
+      color: #004400;
+    }
+
+    #controls {
+      display: flex;
+      padding: 12px;
+      border-top: 1px solid #eee;
+      align-items: center;
+      gap: 8px;
       background: white;
     }
-    input[type=text]{ 
-      flex:1; 
-      padding:10px; 
-      border:1px solid #ccc; 
-      border-radius:6px; 
+
+    input[type=text] {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
       font-size: 14px;
     }
+
     input[type=text]:focus {
       outline: none;
       border-color: #667eea;
     }
-    button{ 
-      padding:10px 16px; 
-      border-radius:6px; 
-      border:none; 
+
+    button {
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: none;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      cursor:pointer; 
+      cursor: pointer;
       font-weight: 600;
       transition: transform 0.2s;
     }
-    button:hover{ 
+
+    button:hover {
       transform: scale(1.05);
     }
-    .suggestion{ 
-      background:#fff; 
-      border:1px solid #ddd; 
-      padding:8px; 
-      margin-top:6px; 
-      border-radius:4px; 
+
+    .suggestion {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 8px;
+      margin-top: 6px;
+      border-radius: 4px;
     }
-    .meta { font-size: 0.85em; color: #666; margin-top:4px; }
-    #diagnostics { 
-      border-top:1px dashed #eee; 
-      padding:10px; 
-      font-size:0.9em; 
-      color:#333; 
-      background:#fcfcfd; 
+
+    .meta {
+      font-size: 0.85em;
+      color: #666;
+      margin-top: 4px;
     }
-    #diagToggle { margin-left:8px; }
-    .label { font-weight:600; margin-right:6px; color:#222; }
-    .small { font-size:0.85em; color:#666; }
-    .row { display:flex; gap:8px; align-items:center; }
-    #rawJson { 
-      white-space: pre-wrap; 
-      background:#0f1724; 
-      color:#dbeafe; 
-      padding:8px; 
-      border-radius:4px; 
-      margin-top:8px; 
-      overflow:auto; 
-      max-height:220px; 
+
+    #diagnostics {
+      border-top: 1px dashed #eee;
+      padding: 10px;
+      font-size: 0.9em;
+      color: #333;
+      background: #fcfcfd;
     }
-    footer { 
-      padding:10px 12px; 
-      font-size:0.8em; 
-      color:#666; 
-      text-align:center; 
-      border-top:1px solid #eee; 
+
+    #diagToggle {
+      margin-left: 8px;
+    }
+
+    .label {
+      font-weight: 600;
+      margin-right: 6px;
+      color: #222;
+    }
+
+    .small {
+      font-size: 0.85em;
+      color: #666;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #rawJson {
+      white-space: pre-wrap;
+      background: #0f1724;
+      color: #dbeafe;
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      overflow: auto;
+      max-height: 220px;
+    }
+
+    footer {
+      padding: 10px 12px;
+      font-size: 0.8em;
+      color: #666;
+      text-align: center;
+      border-top: 1px solid #eee;
       background: #fafafa;
     }
+
     .refresh-indicator {
       font-size: 10px;
       color: #999;
       margin-top: 10px;
       text-align: center;
     }
+
     .ticker-container {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       padding: 12px;
       border-radius: 12px 12px 0 0;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
+
     .weather-section {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding-bottom: 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.3);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.3);
       margin-bottom: 10px;
     }
+
     .weather-info {
       display: flex;
       align-items: center;
@@ -297,18 +435,22 @@
       font-size: 14px;
       font-weight: 500;
     }
+
     .weather-temp {
       font-size: 22px;
       font-weight: bold;
     }
+
     .weather-location {
       font-size: 12px;
       opacity: 0.9;
     }
+
     .events-section {
       overflow: hidden;
       position: relative;
     }
+
     .ticker-title {
       font-size: 11px;
       font-weight: 600;
@@ -317,36 +459,49 @@
       margin-bottom: 5px;
       opacity: 0.9;
     }
+
     .ticker-content {
       display: flex;
       animation: scroll 30s linear infinite;
       white-space: nowrap;
     }
+
     .ticker-item {
       display: inline-flex;
       align-items: center;
       margin-right: 40px;
       font-size: 13px;
     }
+
     .ticker-icon {
       margin-right: 6px;
       font-size: 16px;
     }
+
     @keyframes scroll {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
+      0% {
+        transform: translateX(0);
+      }
+
+      100% {
+        transform: translateX(-50%);
+      }
     }
+
     .ticker-content:hover {
       animation-play-state: paused;
     }
+
     .ticker-item {
       cursor: pointer;
       transition: all 0.2s ease;
     }
+
     .ticker-item:hover {
       transform: scale(1.05);
-      text-shadow: 0 0 8px rgba(255,255,255,0.5);
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
     }
+
     .modal {
       display: none;
       position: fixed;
@@ -358,24 +513,33 @@
       background-color: rgba(0, 0, 0, 0.5);
       animation: fadeIn 0.3s ease;
     }
+
     .modal.active {
       display: flex;
       justify-content: center;
       align-items: center;
     }
+
     @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
     }
+
     .modal-content {
       background-color: white;
       padding: 30px;
       border-radius: 12px;
       max-width: 500px;
       width: 90%;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
       animation: slideUp 0.3s ease;
     }
+
     .modal-header {
       display: flex;
       justify-content: space-between;
@@ -384,6 +548,7 @@
       border-bottom: 2px solid #667eea;
       padding-bottom: 12px;
     }
+
     .modal-title {
       font-size: 22px;
       font-weight: 600;
@@ -392,6 +557,7 @@
       align-items: center;
       gap: 10px;
     }
+
     .close-btn {
       background: none;
       border: none;
@@ -400,18 +566,22 @@
       color: #999;
       transition: color 0.2s;
     }
+
     .close-btn:hover {
       color: #333;
     }
+
     .modal-body {
       margin-bottom: 20px;
       line-height: 1.6;
     }
+
     .modal-actions {
       display: flex;
       gap: 10px;
       justify-content: flex-end;
     }
+
     .modal-btn {
       padding: 10px 16px;
       border: none;
@@ -420,35 +590,42 @@
       font-weight: 600;
       transition: all 0.2s;
     }
+
     .modal-btn-primary {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
     }
+
     .modal-btn-primary:hover {
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
+
     .modal-btn-secondary {
       background: #f0f0f0;
       color: #333;
     }
+
     .modal-btn-secondary:hover {
       background: #e0e0e0;
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div id="chat">
       <!-- Weather & Events Ticker -->
       <div class="ticker-container">
         <!-- User Profile & Logout Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.3); margin-bottom: 12px;">
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.3); margin-bottom: 12px;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span id="user-avatar" style="font-size: 20px;">👤</span>
             <span id="user-info" style="font-size: 12px; opacity: 0.9;">Guest</span>
           </div>
-          <button onclick="handleLogout()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">Logout</button>
+          <button onclick="handleLogout()"
+            style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">Logout</button>
         </div>
 
         <!-- Static Weather Section -->
@@ -459,22 +636,26 @@
           </div>
           <div class="weather-location" id="weather-location">📍 New York City, NY</div>
         </div>
-        
+
         <!-- Rolling Events Section -->
         <div class="events-section">
           <div class="ticker-title">🎉 Upcoming Events & Activities</div>
           <div class="ticker-content" id="ticker-content">
             <div class="ticker-item"><span class="ticker-icon">🎭</span>Broadway Show at 8 PM - Times Square</div>
             <div class="ticker-item"><span class="ticker-icon">🍽️</span>Happy Hour 5-7 PM at Hotel Bar</div>
-            <div class="ticker-item"><span class="ticker-icon">🎨</span>MoMA Exhibition: Modern Masters - Open until 9 PM</div>
+            <div class="ticker-item"><span class="ticker-icon">🎨</span>MoMA Exhibition: Modern Masters - Open until 9
+              PM</div>
             <div class="ticker-item"><span class="ticker-icon">🏃</span>Morning Yoga - Hotel Gym 7 AM Tomorrow</div>
-            <div class="ticker-item"><span class="ticker-icon">⚽</span>Yankees Game Tonight - Yankee Stadium 7:30 PM</div>
+            <div class="ticker-item"><span class="ticker-icon">⚽</span>Yankees Game Tonight - Yankee Stadium 7:30 PM
+            </div>
             <!-- Duplicate for seamless loop -->
             <div class="ticker-item"><span class="ticker-icon">🎭</span>Broadway Show at 8 PM - Times Square</div>
             <div class="ticker-item"><span class="ticker-icon">🍽️</span>Happy Hour 5-7 PM at Hotel Bar</div>
-            <div class="ticker-item"><span class="ticker-icon">🎨</span>MoMA Exhibition: Modern Masters - Open until 9 PM</div>
+            <div class="ticker-item"><span class="ticker-icon">🎨</span>MoMA Exhibition: Modern Masters - Open until 9
+              PM</div>
             <div class="ticker-item"><span class="ticker-icon">🏃</span>Morning Yoga - Hotel Gym 7 AM Tomorrow</div>
-            <div class="ticker-item"><span class="ticker-icon">⚽</span>Yankees Game Tonight - Yankee Stadium 7:30 PM</div>
+            <div class="ticker-item"><span class="ticker-icon">⚽</span>Yankees Game Tonight - Yankee Stadium 7:30 PM
+            </div>
           </div>
         </div>
       </div>
@@ -485,7 +666,8 @@
         <input id="message" placeholder="Ask me anything..." />
         <div style="display: flex; gap: 10px; align-items: center;">
           <label class="small"><input type="checkbox" id="shareLocation" /> 📍 Location</label>
-          <select id="languageSelect" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white;">
+          <select id="languageSelect"
+            style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: white;">
             <option value="auto">🌐 Auto-detect</option>
             <option value="en">🇺🇸 English</option>
             <option value="es">🇪🇸 Español</option>
@@ -506,7 +688,8 @@
       </div>
 
       <div id="diagnostics" style="display:none;">
-        <div class="row"><span class="label">Client-parsed city:</span><span id="clientCity" class="small">-</span></div>
+        <div class="row"><span class="label">Client-parsed city:</span><span id="clientCity" class="small">-</span>
+        </div>
         <div class="row"><span class="label">Payload coords:</span><span id="payloadCoords" class="small">-</span></div>
         <div class="row"><span class="label">Server intent:</span><span id="srvIntent" class="small">-</span></div>
         <div class="row"><span class="label">Server liveLookup:</span><span id="srvLive" class="small">-</span></div>
@@ -612,7 +795,8 @@
       </div>
       <div class="modal-body">
         <p id="event-description"></p>
-        <div id="event-details" style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 13px;"></div>
+        <div id="event-details"
+          style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 13px;"></div>
       </div>
       <div class="modal-actions">
         <button class="modal-btn modal-btn-secondary" onclick="closeEventModal()">Close</button>
@@ -637,7 +821,7 @@
 
     let cachedCoords = null;
     let cachedLocation = null;
-    const sessionId = 'session-' + Math.random().toString(36).slice(2,9);
+    const sessionId = 'session-' + Math.random().toString(36).slice(2, 9);
     const conversationHistory = [];
     let sessionToken = null;
     let userPersona = null;
@@ -651,13 +835,13 @@
       document.getElementById('event-icon').textContent = eventData.icon;
       document.getElementById('event-title').textContent = eventData.title;
       document.getElementById('event-description').textContent = eventData.description;
-      
+
       let detailsHtml = '';
       if (eventData.details) {
         detailsHtml = eventData.details.map(detail => `<div style="margin: 6px 0;"><strong>${detail.label}:</strong> ${detail.value}</div>`).join('');
       }
       document.getElementById('event-details').innerHTML = detailsHtml || '<em>No additional details available</em>';
-      
+
       document.getElementById('event-modal').classList.add('active');
     }
 
@@ -668,7 +852,7 @@
 
     function addEventToChat() {
       if (!currentEventData) return;
-      
+
       const message = `I'm interested in: ${currentEventData.title}. Can you help me with more information or bookings?`;
       sendMessage(message);
       closeEventModal();
@@ -767,38 +951,38 @@
       window.location.href = 'login.html';
     }
 
-    function append(text, who='bot', messageId=null) {
+    function append(text, who = 'bot', messageId = null) {
       const d = document.createElement('div');
       d.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
-      
+
       // Create text span
       const textSpan = document.createElement('span');
       textSpan.innerText = (who === 'user' ? 'You: ' : 'Bot: ') + text;
       d.appendChild(textSpan);
-      
+
       // Add rating buttons for bot messages
       if (who === 'bot' && messageId) {
         const ratingDiv = document.createElement('div');
         ratingDiv.className = 'rating-buttons';
         ratingDiv.style.display = 'inline-flex';
-        
+
         const thumbsUp = document.createElement('button');
         thumbsUp.className = 'rating-btn thumbs-up';
         thumbsUp.innerHTML = '👍';
         thumbsUp.title = 'Helpful response';
         thumbsUp.onclick = () => rateResponse(messageId, 'positive', thumbsUp, thumbsDown);
-        
+
         const thumbsDown = document.createElement('button');
         thumbsDown.className = 'rating-btn thumbs-down';
         thumbsDown.innerHTML = '👎';
         thumbsDown.title = 'Not helpful';
         thumbsDown.onclick = () => rateResponse(messageId, 'negative', thumbsUp, thumbsDown);
-        
+
         ratingDiv.appendChild(thumbsUp);
         ratingDiv.appendChild(thumbsDown);
         d.appendChild(ratingDiv);
       }
-      
+
       historyEl.appendChild(d);
       historyEl.scrollTop = historyEl.scrollHeight;
       return d;
@@ -815,7 +999,7 @@
         r.innerText = `Reason: ${s.reason}`;
         el.appendChild(r);
       }
-      
+
       // Add click handler to select place and ask for more details
       el.onclick = () => {
         lastSelectedPlace = s;  // Store the selected place
@@ -823,7 +1007,7 @@
         append(detailsRequest, 'user', null);
         sendMessage(detailsRequest);
       };
-      
+
       // Add hover effect
       el.onmouseenter = () => {
         el.style.backgroundColor = '#f0f0f0';
@@ -833,13 +1017,13 @@
         el.style.backgroundColor = '';
         el.style.fontWeight = 'normal';
       };
-      
+
       historyEl.appendChild(el);
       historyEl.scrollTop = historyEl.scrollHeight;
     }
 
     function escapeHtml(str) {
-      return String(str).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+      return String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
     }
 
     async function rateResponse(messageId, rating, thumbsUpBtn, thumbsDownBtn) {
@@ -857,7 +1041,7 @@
             timestamp: new Date().toISOString()
           })
         });
-        
+
         if (response.ok) {
           // Visual feedback
           if (rating === 'positive') {
@@ -949,11 +1133,11 @@
 
         // Generate unique message ID for this response
         const messageId = json.messageId || 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
-        
+
         // Remove placeholder and add new message with rating buttons
         botPlaceholder.remove();
         append(json.reply || 'Sorry, something went wrong.', 'bot', messageId);
-        
+
         // Track conversation history
         conversationHistory.push({ role: 'user', content: text });
         conversationHistory.push({ role: 'assistant', content: json.reply });
@@ -999,7 +1183,7 @@
       if (!roomNumber) return;
 
       const details = prompt('Any specific details or requests?', '');
-      
+
       try {
         const response = await fetch('http://localhost:3000/api/message', {
           method: 'POST',
@@ -1016,13 +1200,13 @@
             sessionToken
           })
         });
-        
+
         const result = await response.json();
-        
+
         // Show confirmation in chat
         append(`Request submitted: ${requestType} for Room ${roomNumber}`, 'user', null);
         append(result.reply || 'Your request has been submitted. Our team will assist you shortly.', 'bot', null);
-        
+
         // Refresh analytics to show new ticket
         fetchAnalytics();
       } catch (error) {
@@ -1087,18 +1271,18 @@
         const now = new Date();
         const hour = now.getHours();
         const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
-        
+
         // Try to get user's location
         let userLocation = cachedLocation || 'New York City, NY';
         let coords = cachedCoords;
-        
+
         // Attempt to get browser location if not cached
         if (!cachedCoords) {
           try {
             const position = await new Promise((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, { 
-                timeout: 5000, 
-                maximumAge: 300000 
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                timeout: 5000,
+                maximumAge: 300000
               });
             });
             cachedCoords = {
@@ -1106,13 +1290,13 @@
               lon: position.coords.longitude.toString()
             };
             coords = cachedCoords;
-            
+
             // Reverse geocode to get city name
             const geoResponse = await fetch(
               `https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lon}&format=json`
             );
             const geoData = await geoResponse.json();
-            
+
             if (geoData.address) {
               const city = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.county;
               const state = geoData.address.state;
@@ -1126,7 +1310,7 @@
         } else {
           userLocation = cachedLocation;
         }
-        
+
         // Fetch real weather data using Open-Meteo API (free, no key needed)
         let weatherData = { temp: 72, condition: '🌤️ Sunny', icon: '☀️' };
         if (coords) {
@@ -1135,11 +1319,11 @@
               `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current_weather=true&temperature_unit=fahrenheit`
             );
             const weather = await weatherResponse.json();
-            
+
             if (weather.current_weather) {
               const temp = Math.round(weather.current_weather.temperature);
               const weatherCode = weather.current_weather.weathercode;
-              
+
               // Map weather codes to conditions
               const weatherConditions = {
                 0: { condition: '☀️ Clear', icon: '☀️' },
@@ -1153,7 +1337,7 @@
                 71: { condition: '🌨️ Snow', icon: '🌨️' },
                 95: { condition: '⛈️ Thunderstorm', icon: '⛈️' }
               };
-              
+
               const weatherInfo = weatherConditions[weatherCode] || { condition: '🌤️ Partly Cloudy', icon: '⛅' };
               weatherData = { temp, condition: weatherInfo.condition, icon: weatherInfo.icon };
             }
@@ -1161,21 +1345,21 @@
             console.log('Weather API failed, using default');
           }
         }
-        
+
         // Update static weather display with real data
         document.getElementById('weather-temp').textContent = `${weatherData.temp}°F`;
         document.getElementById('weather-condition').textContent = weatherData.condition;
         document.getElementById('weather-location').textContent = `📍 ${userLocation}`;
-        
+
         // Generate location-specific events
         const isNYC = userLocation.includes('New York');
         const events = [];
-        
+
         if (isNYC) {
           // NYC-specific events
           events.push(
-            { 
-              icon: '🎭', 
+            {
+              icon: '🎭',
               title: 'Broadway Show: Hamilton',
               text: 'Broadway Show: Hamilton - Richard Rodgers Theatre 8 PM',
               description: 'Experience the critically acclaimed musical Hamilton at the Richard Rodgers Theatre.',
@@ -1186,8 +1370,8 @@
                 { label: 'Price Range', value: '$$ - $$$' }
               ]
             },
-            { 
-              icon: '🗽', 
+            {
+              icon: '🗽',
               title: 'Statue of Liberty Tours',
               text: 'Statue of Liberty Tours - Departing every hour from Battery Park',
               description: 'Visit one of America\'s most iconic monuments with guided tours.',
@@ -1198,8 +1382,8 @@
                 { label: 'Price', value: '$24.50 per adult' }
               ]
             },
-            { 
-              icon: '🎨', 
+            {
+              icon: '🎨',
               title: 'MoMA Exhibition: Modern Masters',
               text: 'MoMA Exhibition: Modern Masters - Open until 9 PM',
               description: 'Explore world-class modern and contemporary art at the Museum of Modern Art.',
@@ -1210,8 +1394,8 @@
                 { label: 'Highlights', value: 'Picasso, Warhol, Van Gogh' }
               ]
             },
-            { 
-              icon: '⚽', 
+            {
+              icon: '⚽',
               title: 'Yankees Game Tonight',
               text: 'Yankees Game Tonight - Yankee Stadium 7:30 PM',
               description: 'Catch the New York Yankees in action at historic Yankee Stadium.',
@@ -1222,8 +1406,8 @@
                 { label: 'Tickets', value: 'Available at box office' }
               ]
             },
-            { 
-              icon: '🎵', 
+            {
+              icon: '🎵',
               title: `${dayOfWeek} Live Jazz`,
               text: `${dayOfWeek} Live Jazz - Blue Note Jazz Club 9 PM`,
               description: 'Enjoy world-class live jazz performances at the legendary Blue Note.',
@@ -1234,8 +1418,8 @@
                 { label: 'Reservations', value: 'Recommended' }
               ]
             },
-            { 
-              icon: '🍕', 
+            {
+              icon: '🍕',
               title: 'Best Pizza Tour',
               text: 'Best Pizza Tour - Little Italy & Brooklyn',
               description: 'Taste authentic New York pizza at the city\'s most famous pizzerias.',
@@ -1250,8 +1434,8 @@
         } else {
           // Generic hotel events for any location
           events.push(
-            { 
-              icon: '🎭', 
+            {
+              icon: '🎭',
               title: 'Local Theater',
               text: 'Check Local Theater Performances Tonight',
               description: 'Discover local theatrical performances and live shows in the area.',
@@ -1261,8 +1445,8 @@
                 { label: 'Ask Concierge', value: 'For personalized recommendations' }
               ]
             },
-            { 
-              icon: '🎨', 
+            {
+              icon: '🎨',
               title: 'Museums & Art Galleries',
               text: 'Visit Local Museums & Art Galleries',
               description: 'Explore world-class art and cultural institutions nearby.',
@@ -1272,8 +1456,8 @@
                 { label: 'Ask Concierge', value: 'For recommendations based on your interests' }
               ]
             },
-            { 
-              icon: '🍽️', 
+            {
+              icon: '🍽️',
               title: 'Downtown Dining',
               text: 'Explore Downtown Restaurants & Cafes',
               description: 'Discover the finest dining experiences in the area.',
@@ -1283,8 +1467,8 @@
                 { label: 'Ask Concierge', value: 'For reservations & recommendations' }
               ]
             },
-            { 
-              icon: '🏛️', 
+            {
+              icon: '🏛️',
               title: 'Historical Sites',
               text: 'Historical Sites & City Tours Available',
               description: 'Learn about the rich history of this city through guided tours.',
@@ -1294,8 +1478,8 @@
                 { label: 'Ask Concierge', value: 'For booking & information' }
               ]
             },
-            { 
-              icon: '🎵', 
+            {
+              icon: '🎵',
               title: `${dayOfWeek} Live Music`,
               text: `${dayOfWeek} Live Music - Ask Concierge for Recommendations`,
               description: 'Enjoy live music performances at local venues.',
@@ -1305,8 +1489,8 @@
                 { label: 'Ask Concierge', value: 'For tonight\'s performances' }
               ]
             },
-            { 
-              icon: '🚶', 
+            {
+              icon: '🚶',
               title: 'Walking Tours',
               text: 'Walking Tours & Local Attractions',
               description: 'Explore the city on foot with guided neighborhood tours.',
@@ -1318,11 +1502,11 @@
             }
           );
         }
-        
+
         // Add time-based hotel events (works anywhere)
         events.push(
-          { 
-            icon: '🍽️', 
+          {
+            icon: '🍽️',
             title: hour < 19 ? 'Happy Hour' : 'Late Night Menu',
             text: hour < 19 ? 'Happy Hour 5-7 PM - Hotel Rooftop Bar' : 'Late Night Menu - Hotel Restaurant until 2 AM',
             description: hour < 19 ? 'Enjoy discounted drinks and appetizers at our rooftop bar.' : 'Order from our late-night menu available until 2 AM.',
@@ -1332,8 +1516,8 @@
               { label: 'Call Extension', value: '2050' }
             ]
           },
-          { 
-            icon: '🏃', 
+          {
+            icon: '🏃',
             title: hour < 7 ? 'Morning Yoga' : 'Evening Fitness',
             text: hour < 7 ? 'Morning Yoga Class - Hotel Gym 7 AM' : 'Evening Fitness Class - Hotel Gym 6 PM',
             description: hour < 7 ? 'Start your day with a relaxing yoga session.' : 'Join our evening fitness class to stay active.',
@@ -1344,8 +1528,8 @@
               { label: 'No Prior Booking', value: 'Drop-in welcome!' }
             ]
           },
-          { 
-            icon: '🛎️', 
+          {
+            icon: '🛎️',
             title: 'Concierge Services',
             text: 'Concierge Services Available 24/7',
             description: 'Our concierge team is always available to assist with your needs.',
@@ -1355,8 +1539,8 @@
               { label: 'Reach Us', value: 'Dial 0 from your room or visit the lobby' }
             ]
           },
-          { 
-            icon: '🚕', 
+          {
+            icon: '🚕',
             title: 'Express Taxi Service',
             text: 'Express Taxi Service - Ask Front Desk',
             description: 'Need a ride? Our express taxi service is fast and reliable.',
@@ -1367,12 +1551,12 @@
             ]
           }
         );
-        
+
         // Build rolling events HTML with click handlers (duplicate for seamless loop)
-        const eventsHTML = [...events, ...events].map((e, idx) => 
+        const eventsHTML = [...events, ...events].map((e, idx) =>
           `<div class="ticker-item" onclick="handleEventClick({icon: '${e.icon}', title: '${e.title.replace(/'/g, "\\'")}', description: '${e.description.replace(/'/g, "\\'")}', details: ${JSON.stringify(e.details).replace(/"/g, '&quot;')}})"><span class="ticker-icon">${e.icon}</span>${e.text}</div>`
         ).join('');
-        
+
         document.getElementById('ticker-content').innerHTML = eventsHTML;
       } catch (error) {
         console.error('Failed to update ticker:', error);
@@ -1382,6 +1566,96 @@
     // Update ticker on load and every 60 seconds
     updateTicker();
     setInterval(updateTicker, 60000);
+
+
+// ============================================
+// GUEST TICKETS LOADING
+// ============================================
+
+// Fetch and display guest's open tickets
+async function loadMyTickets() {
+    if (!sessionToken) return;
+
+    try {
+        const response = await fetch('http://localhost:3000/api/my-tickets', {
+            headers: {
+                'Authorization': `Bearer ${sessionToken}`
+            }
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch tickets');
+            return;
+        }
+
+        const data = await response.json();
+        renderTickets(data.tickets || []);
+
+        // Update last refresh time
+        const now = new Date();
+        document.getElementById('last-refresh').textContent = now.toLocaleTimeString();
+    } catch (error) {
+        console.error('Error loading tickets:', error);
+    }
+}
+
+// Render tickets in the sidebar
+function renderTickets(tickets) {
+    const container = document.getElementById('recent-tickets-mini');
+    let newHtml = '';
+
+    if (!tickets || tickets.length === 0) {
+        newHtml = '<div style="text-align:center; color:#999; padding:10px;">No open tickets</div>';
+    } else {
+        newHtml = tickets.map(ticket => {
+            const createdDate = new Date(ticket.createdAt || ticket.timestamp);
+            const timeAgo = getTimeAgo(createdDate);
+            const type = ticket.type || ticket.requestType || 'Service';
+            const description = ticket.description || 'No description';
+            const ticketId = ticket.ticketId || ticket._id || 'N/A';
+            
+            return '<div class="ticket-item"><div class="ticket-header"><div class="ticket-type">' + type + '</div><div class="ticket-status">' + (ticket.status || 'Open') + '</div></div><div class="ticket-description">' + description.substring(0, 60) + (description.length > 60 ? '...' : '') + '</div><div class="ticket-time">⏱️ ' + timeAgo + '</div><div class="ticket-id">#' + ticketId + '</div></div>';
+        }).join('');
+    }
+
+    // Only update if content has changed to prevent blinking
+    if (container.innerHTML !== newHtml) {
+        container.innerHTML = newHtml;
+    }
+}
+
+// Helper function to get time ago
+function getTimeAgo(date) {
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+
+    if (seconds < 60) return seconds + 's ago';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return minutes + 'm ago';
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + 'h ago';
+    const days = Math.floor(hours / 24);
+    return days + 'd ago';
+}
+
+    // Initialize ticket loading for guests
+    // Ensure session is initialized first
+    if (typeof initializeSession === 'function') {
+        initializeSession().then(() => {
+            if (sessionToken && userPersona === 'guest') {
+                loadMyTickets();
+                setInterval(loadMyTickets, 5000);
+            }
+        });
+    } else {
+        // Fallback if initializeSession is not available or already ran
+        if (sessionToken && userPersona === 'guest') {
+            loadMyTickets();
+            setInterval(loadMyTickets, 5000);
+        }
+    }
+
   </script>
 </body>
+
 </html>
