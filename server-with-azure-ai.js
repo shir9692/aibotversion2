@@ -308,22 +308,33 @@ async function trackGuestSatisfaction(sessionId, rating, feedback = '', category
 }
 
 // NEW: Track service request lifecycle
-function trackServiceRequest(ticketId, type, priority, status = 'open', responseTime = null, resolutionTime = null) {
+// NEW: Track service request lifecycle
+function trackServiceRequest(ticketId, type, priority, status = 'open', responseTime = null, resolutionTime = null, details = {}) {
   const existing = analytics.serviceRequests.find(r => r.ticketId === ticketId);
   if (existing) {
     existing.status = status;
     existing.responseTime = responseTime;
     existing.resolutionTime = resolutionTime;
+    // Update details if provided
+    if (details.guestName) existing.guestName = details.guestName;
+    if (details.roomNumber) existing.roomNumber = details.roomNumber;
+    if (details.description) existing.description = details.description;
   } else {
-    analytics.serviceRequests.push({
+    const newRequest = {
       ticketId,
       type,
+      requestType: type, // For dashboard compatibility
       priority,
       status,
       responseTime,
       resolutionTime,
-      createdAt: new Date().toISOString()
-    });
+      createdAt: new Date().toISOString(),
+      guestName: details.guestName || 'Guest',
+      roomNumber: details.roomNumber || 'N/A',
+      description: details.description || ''
+    };
+    console.log('🔍 DEBUG - Pushing new service request:', newRequest);
+    analytics.serviceRequests.push(newRequest);
   }
 }
 
@@ -1711,10 +1722,20 @@ async function executeToolCall(toolCall) {
 
     case 'createTicket': {
       const ticketId = `TKT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      // Get guest info from session if available
+      const sessionInfo = global.currentSessionInfo || {};
+      const guestName = args.guestName || sessionInfo.guestName || 'Guest';
+      const roomNumber = args.roomNumber || sessionInfo.roomNumber || 'Not specified';
+
+      console.log('🔍 DEBUG - Session info:', sessionInfo);
+      console.log('🔍 DEBUG - Args:', args);
+      console.log('🔍 DEBUG - Final values:', { guestName, roomNumber });
+
       const ticket = {
         id: ticketId,
-        guestName: args.guestName || 'Guest',
-        roomNumber: args.roomNumber || 'Not specified',
+        guestName: guestName,
+        roomNumber: roomNumber,
         requestType: args.requestType,
         priority: args.priority || 'Medium',
         description: args.description,
@@ -1768,7 +1789,11 @@ async function executeToolCall(toolCall) {
         trackTicket(sessionId, ticketId, args.requestType);
 
         // NEW: Track service request for operations dashboard
-        trackServiceRequest(ticketId, args.requestType, args.priority || 'Medium', 'open');
+        trackServiceRequest(ticketId, args.requestType, args.priority || 'Medium', 'open', null, null, {
+          guestName,
+          roomNumber,
+          description: args.description
+        });
         trackCommonIssue(args.requestType);
         trackPeakDemand();
         trackDeflection(false); // Ticket created = not deflected
@@ -2131,13 +2156,26 @@ ${locationContext}${profileContext}${onboardingPrompt}
 
 app.post('/api/message', async (req, res) => {
   try {
-    const { sessionId = 'anon', message = '', consentLocation = false, coords, city, conversationHistory = [], lastPlace } = req.body;
+    const { sessionId = 'anon', message = '', consentLocation = false, coords, city, conversationHistory = [], lastPlace, sessionToken } = req.body;
 
     // NEW: Track request start time for response time metrics
     global.requestStartTime = Date.now();
 
     // Track the question in analytics
     trackQuestion(sessionId, message);
+
+    // NEW: Get session info for guest name and room number
+    if (sessionToken) {
+      console.log('🔍 DEBUG - Session token received:', sessionToken.substring(0, 10) + '...');
+      const sessionInfo = auth.getSessionInfo(sessionToken);
+      console.log('🔍 DEBUG - Session info retrieved:', sessionInfo);
+      if (sessionInfo) {
+        global.currentSessionInfo = sessionInfo; // Store for ticket creation
+        console.log('🔍 DEBUG - Stored in global.currentSessionInfo');
+      }
+    } else {
+      console.log('⚠️ DEBUG - No session token in request');
+    }
 
     if (activeRequests.get(sessionId)) {
       return res.json({
@@ -2458,7 +2496,7 @@ app.get('/api/analytics', async (req, res) => {
     }
 
     // Response to all analytics requests with actionable insights
-    res.json({
+    const responsePayload = {
       // GUEST EXPERIENCE METRICS
       guestExperience: {
         satisfactionScore: parseFloat(avgSatisfaction.toFixed(2)),
@@ -2509,7 +2547,15 @@ app.get('/api/analytics', async (req, res) => {
         ragPerformance: analytics.ragPerformance.slice(-100),
         responseTracking: analytics.responseTimeTracking.slice(-100)
       }
-    });
+    };
+
+    console.log('🔍 DEBUG - Sending analytics data. Service Requests count:', analytics.serviceRequests.length);
+    if (analytics.serviceRequests.length > 0) {
+      console.log('🔍 DEBUG - Last service request:', analytics.serviceRequests[analytics.serviceRequests.length - 1]);
+    }
+
+    res.json(responsePayload);
+
   } catch (error) {
     console.error('Analytics API error:', error);
     res.status(500).json({ error: 'Failed to retrieve analytics' });

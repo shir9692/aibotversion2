@@ -365,7 +365,8 @@
     <script>
         async function loadAnalytics() {
             try {
-                const response = await fetch('/api/analytics');
+                // Add timestamp to prevent caching
+                const response = await fetch('/api/analytics?t=' + Date.now());
                 const data = await response.json();
 
                 // Update KPI Cards
@@ -424,12 +425,17 @@
                             ticket.status === 'open' ? 'badge-warning' : 'badge-info';
                         const priorityBadge = ticket.priority === 'High' || ticket.priority === 'Urgent' ?
                             'badge-danger' : 'badge-info';
+
+                        const type = ticket.requestType || ticket.type || 'Service Request';
+                        const guestName = ticket.guestName || 'Guest';
+                        const roomNumber = ticket.roomNumber || 'N/A';
+
                         return `
                     <div class="list-item">
                         <div>
-                            <div class="list-item-title">${ticket.requestType} - ${ticket._id || ticket.ticketId}</div>
+                            <div class="list-item-title">${type} - ${ticket._id || ticket.ticketId}</div>
                             <div style="color: #666; font-size: 13px; margin-top: 4px;">
-                                👤 ${ticket.guestName || 'Guest'} • 🚪 Room ${ticket.roomNumber || 'N/A'}
+                                👤 ${guestName} • 🚪 Room ${roomNumber}
                             </div>
                             <div style="color: #888; font-size: 12px; margin-top: 2px;">
                                 ${ticket.description || 'No description'}
@@ -559,18 +565,24 @@
             }
 
             const recentRequests = requests.slice(-10).reverse();
+            console.log('DEBUG - Recent Requests:', recentRequests);
             container.innerHTML = recentRequests.map(request => {
                 const statusBadge = request.status === 'resolved' ? 'badge-success' :
                     request.status === 'open' ? 'badge-warning' : 'badge-info';
                 const priorityBadge = request.priority === 'High' || request.priority === 'Urgent' ?
                     'badge-danger' : 'badge-info';
 
+                // Robust rendering logic
+                const type = request.type || request.requestType || 'Service Request';
+                const guestName = request.guestName || 'Guest';
+                const roomNumber = request.roomNumber || 'N/A';
+
                 return `
                     <div class="list-item">
                         <div>
-                            <div class="list-item-title">${request.type} - ${request.ticketId}</div>
+                            <div class="list-item-title">${type} - ${request.ticketId}</div>
                             <div style="color: #666; font-size: 13px; margin-top: 4px;">
-                                👤 ${request.guestName || 'Guest'} • 🚪 Room ${request.roomNumber || 'N/A'}
+                                👤 ${guestName} • 🚪 Room ${roomNumber}
                             </div>
                             <div style="color: #888; font-size: 12px; margin-top: 2px;">
                                 ${request.description || 'No description'}
