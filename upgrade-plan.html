@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade Plan - AI Concierge</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 400;
+            margin: 0;
+            color: #202124;
+        }
+
+        .plan-card {
+            background: #fff;
+            border-radius: 24px;
+            box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+            padding: 40px;
+            max-width: 500px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plan-eyebrow {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            color: #5f6368;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .plan-title {
+            font-size: 28px;
+            font-weight: 400;
+            margin: 0 0 8px 0;
+            color: #202124;
+        }
+
+        .plan-subtitle {
+            font-size: 14px;
+            color: #5f6368;
+            margin-bottom: 24px;
+        }
+
+        .price-section {
+            border-top: 1px solid #dadce0;
+            border-bottom: 1px solid #dadce0;
+            padding: 24px 0;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .price {
+            font-size: 24px;
+            color: #3c4043;
+        }
+
+        .features-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 32px 0;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 20px;
+            color: #3c4043;
+        }
+
+        .feature-icon {
+            margin-right: 16px;
+            color: #1a73e8;
+            flex-shrink: 0;
+        }
+
+        .btn-primary {
+            display: block;
+            width: 100%;
+            background-color: #1a73e8;
+            color: #fff;
+            text-decoration: none;
+            text-align: center;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: #1557b0;
+            box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3);
+        }
+
+        /* SVG Icons */
+        svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .plan-card {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Change your Concierge plan</h1>
+        </div>
+
+        <div class="plan-card">
+            <div class="plan-eyebrow">RECOMMENDED UPGRADE</div>
+            <h2 class="plan-title">Concierge AI Pro</h2>
+            <div class="plan-subtitle">Share access with up to 5 guests</div>
+
+            <div class="price-section">
+                <span class="price">$19.99 / stay</span>
+            </div>
+
+            <ul class="features-list">
+                <li class="feature-item">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
+                    </div>
+                    <span><strong>AI Personal Butler</strong> with advanced reasoning & handling of complex
+                        requests</span>
+                </li>
+                <li class="feature-item">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
+                    </div>
+                    <span><strong>Priority Reservations</strong> at exclusive local dining</span>
+                </li>
+                <li class="feature-item">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
+                    </div>
+                    <span><strong>Event Specialist</strong> access for ticket booking</span>
+                </li>
+                <li class="feature-item">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
+                    </div>
+                    <span><strong>Complex Itinerary Planning</strong> for your entire trip</span>
+                </li>
+                <li class="feature-item">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
+                    </div>
+                    <span><strong>Logistics Manager</strong> to handle travel & weather safety</span>
+                </li>
+            </ul>
+
+            <button class="btn-primary" onclick="alert('Upgrade flow initiated!')">Upgrade to Pro</button>
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="index.html" style="color: #1a73e8; text-decoration: none; font-size: 14px;">Back to
+                    Concierge</a>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
